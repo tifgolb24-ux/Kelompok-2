@@ -5,6 +5,11 @@
     <div class="mb-6 text-center">
         <h2 class="text-2xl font-bold text-white">Verifikasi Keamanan</h2>
         <p class="text-gray-400 text-sm mt-1">Masukkan kode 6-digit yang dikirim ke email Anda</p>
+        @if(!empty($otpCode))
+            <p class="mt-2 text-xs text-neon inline-block bg-neon/10 px-3 py-1 rounded-full border border-neon/20">
+                <i class="ph ph-magic-wand mr-1"></i> Kode OTP terisi otomatis
+            </p>
+        @endif
     </div>
 
     <form method="POST" action="{{ route('2fa.store') }}" class="space-y-5">
@@ -18,6 +23,7 @@
                     <i class="ph ph-shield-check text-gray-400 text-lg"></i>
                 </div>
                 <input id="code" type="text" name="code" required autofocus autocomplete="off" maxlength="6"
+                    value="{{ old('code', $otpCode ?? '') }}"
                     class="block w-full pl-10 pr-3 py-2 border border-gray-700 rounded-lg bg-dark text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-neon focus:border-neon transition-colors sm:text-sm text-center tracking-widest text-lg font-bold">
             </div>
             <x-input-error :messages="$errors->get('code')" class="mt-2" />

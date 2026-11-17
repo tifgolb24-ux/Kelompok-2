@@ -21,7 +21,10 @@ class TwoFactorController extends Controller
             return redirect()->route('login');
         }
 
-        return view('auth.two-factor');
+        $user = User::find($request->session()->get('2fa_user_id'));
+        $otpCode = $user ? $user->two_factor_code : null;
+
+        return view('auth.two-factor', compact('otpCode'));
     }
 
     /**
