@@ -30,6 +30,12 @@ def configure_database(url: str) -> Engine:
     kwargs = {"pool_pre_ping": True}
     if url.startswith("sqlite"):
         kwargs["connect_args"] = {"check_same_thread": False}
+    elif url.startswith("mysql://"):
+        url = url.replace("mysql://", "mysql+pymysql://", 1)
+    elif url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql+psycopg://", 1)
+    elif url.startswith("postgresql://") and "+psycopg" not in url and "+asyncpg" not in url:
+        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
     engine = create_engine(url, **kwargs)
     SessionLocal.configure(bind=engine)
     return engine
