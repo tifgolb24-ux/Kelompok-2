@@ -6,7 +6,6 @@ gym.data_members.json
 # Test scripts
 test_*.php
 node_modules
-.env
 .phpunit.result.cache
 
 # Biometrics
