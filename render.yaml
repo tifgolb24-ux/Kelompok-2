@@ -17,13 +17,15 @@ services:
       - key: APP_TIMEZONE
         value: Asia/Jakarta
 
-      # SECRET_KEY - generate sendiri, isi di Render dashboard
+      # SECRET_KEY - di-generate otomatis oleh Render
       - key: SECRET_KEY
         generateValue: true
 
-      # DATABASE_URL - isi di Render dashboard dengan URL database
+      # DATABASE_URL - otomatis diisi dari PostgreSQL database di bawah
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: bisagym-db
+          property: connectionString
 
       # CORS: izinkan fitfacely.com
       - key: CORS_ORIGINS
@@ -46,6 +48,10 @@ services:
         value: 0BA9FBFA01B5270C96627C4EF784DA859931E02F04419C829E83484087C34E79
       - key: FACE_MATCH_THRESHOLD
         value: "0.50"
+      - key: FACE_MATCH_AMBIGUITY_MARGIN
+        value: "0.05"
+      - key: FACE_ENROLLMENT_CONSISTENCY_THRESHOLD
+        value: "0.45"
       - key: FACE_MIN_QUALITY_SCORE
         value: "0.70"
       - key: LIVENESS_MODE
@@ -53,10 +59,18 @@ services:
       - key: AUTO_CREATE_DB
         value: "true"
 
-      # Device auth
+      # Device auth - isi manual di Render Dashboard
       - key: DEVICE_AUTH_MODE
         value: shared_secret
       - key: DEVICE_SHARED_SECRET
         sync: false
       - key: DEMO_PASSWORD
         sync: false
+
+# PostgreSQL gratis dari Render (otomatis terhubung ke bisagym-api)
+databases:
+  - name: bisagym-db
+    plan: free
+    region: singapore
+    databaseName: bisagym
+    user: bisagym
