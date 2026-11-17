@@ -48,7 +48,7 @@ class DatabaseSeeder extends Seeder
         $penjaga->assignRole($kasirRole);
 
         $developer = \App\Models\User::firstOrCreate(
-            ['email' => 'developer@bisagym.com'],
+            ['email' => 'anugrahtejomaliki@gmail.com'],
             [
                 'name' => 'Tejo (Developer)',
                 'username' => 'developer',
