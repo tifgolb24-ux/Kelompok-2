@@ -1,0 +1,62 @@
+services:
+  # bisagym-api: Python FastAPI Face Recognition Service
+  - type: web
+    name: bisagym-api
+    runtime: python
+    rootDir: bisagym-api
+    buildCommand: bash build.sh
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    plan: free
+    region: singapore
+
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_NAME
+        value: BisaGym Face API
+      - key: APP_TIMEZONE
+        value: Asia/Jakarta
+
+      # SECRET_KEY - generate sendiri, isi di Render dashboard
+      - key: SECRET_KEY
+        generateValue: true
+
+      # DATABASE_URL - isi di Render dashboard dengan URL database
+      - key: DATABASE_URL
+        sync: false
+
+      # CORS: izinkan fitfacely.com
+      - key: CORS_ORIGINS
+        value: https://fitfacely.com,https://www.fitfacely.com
+
+      # Face AI settings
+      - key: FACE_ENGINE
+        value: opencv_sface
+      - key: FACE_MODEL_NAME
+        value: opencv_sface
+      - key: FACE_MODEL_VERSION
+        value: 2021dec
+      - key: FACE_DETECTION_MODEL_PATH
+        value: runtime-models/face_detection_yunet_2023mar.onnx
+      - key: FACE_RECOGNITION_MODEL_PATH
+        value: runtime-models/face_recognition_sface_2021dec.onnx
+      - key: FACE_DETECTION_MODEL_SHA256
+        value: 8F2383E4DD3CFBB4553EA8718107FC0423210DC964F9F4280604804ED2552FA4
+      - key: FACE_RECOGNITION_MODEL_SHA256
+        value: 0BA9FBFA01B5270C96627C4EF784DA859931E02F04419C829E83484087C34E79
+      - key: FACE_MATCH_THRESHOLD
+        value: "0.50"
+      - key: FACE_MIN_QUALITY_SCORE
+        value: "0.70"
+      - key: LIVENESS_MODE
+        value: none
+      - key: AUTO_CREATE_DB
+        value: "true"
+
+      # Device auth
+      - key: DEVICE_AUTH_MODE
+        value: shared_secret
+      - key: DEVICE_SHARED_SECRET
+        sync: false
+      - key: DEMO_PASSWORD
+        sync: false
