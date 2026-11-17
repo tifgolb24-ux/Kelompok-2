@@ -108,7 +108,11 @@ class TwoFactorController extends Controller
         $user->save();
 
         // Send email
-        Mail::to($user->email)->send(new TwoFactorCodeMail($user->two_factor_code, $user));
+        try {
+            Mail::to($user->email)->send(new TwoFactorCodeMail($user->two_factor_code, $user));
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('SMTP Resend Mail Error: ' . $e->getMessage());
+        }
 
         // Log Activity
         ActivityLog::create([
