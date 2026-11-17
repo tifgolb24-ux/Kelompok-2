@@ -13,12 +13,15 @@
             overflow: hidden;
             border: 2px solid #273024;
         }
-        .kiosk-video-stage video {
+        .kiosk-video-stage video,
+        .kiosk-video-stage img.kiosk-stream-img {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transform: scaleX(-1);
             display: block;
+        }
+        .kiosk-video-stage video {
+            transform: scaleX(-1);
         }
         .kiosk-guide-frame {
             position: absolute;
@@ -200,16 +203,91 @@
                         </div>
                     @endif
 
+                    <!-- Pilihan Sumber Kamera -->
+                    <div class="flex items-center justify-between mb-3 bg-dark/60 p-1.5 rounded-lg border border-gray-800 text-xs">
+                        <span class="text-gray-400 font-medium pl-1 flex items-center">
+                            <i class="ph ph-camera mr-1 text-neon"></i> Sumber Kamera:
+                        </span>
+                        <div class="flex space-x-1">
+                            <button type="button" @click="setCameraSource('webcam')"
+                                :class="cameraSource === 'webcam' ? 'bg-neon text-darker font-bold shadow-sm' : 'text-gray-400 hover:text-white'"
+                                class="px-2.5 py-1 rounded-md transition flex items-center text-xs">
+                                <i class="ph ph-video-camera mr-1 text-sm"></i> Webcam
+                            </button>
+                            <button type="button" @click="setCameraSource('esp32cam')"
+                                :class="cameraSource === 'esp32cam' ? 'bg-neon text-darker font-bold shadow-sm' : 'text-gray-400 hover:text-white'"
+                                class="px-2.5 py-1 rounded-md transition flex items-center text-xs">
+                                <i class="ph ph-broadcast mr-1 text-sm"></i> ESP32-CAM
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Kotak Konfigurasi ESP32-CAM -->
+                    <div x-show="cameraSource === 'esp32cam'" x-transition class="mb-3 p-3 rounded-lg bg-dark/80 border border-gray-700 space-y-2 text-xs">
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-300 font-semibold flex items-center">
+                                <i class="ph ph-wifi-high mr-1 text-neon"></i> Alamat IP / URL ESP32-CAM
+                            </span>
+                            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded"
+                                :class="esp32Connected ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-gray-800 text-gray-400 border border-gray-700'"
+                                x-text="esp32Connected ? 'Stream Aktif' : 'Belum Terhubung'"></span>
+                        </div>
+                        <div class="flex gap-2">
+                            <div class="relative flex-1">
+                                <input type="text" x-model="esp32Ip" @input.debounce.500ms="updateEsp32Url()" 
+                                    placeholder="Contoh: 192.168.1.100 atau http://..."
+                                    class="w-full px-2.5 py-1.5 bg-black/60 border border-gray-700 rounded text-white font-mono text-xs focus:border-neon focus:ring-1 focus:ring-neon">
+                            </div>
+                            <button type="button" @click="testEsp32Connection()" :disabled="esp32Testing || !esp32Ip"
+                                class="px-3 py-1.5 bg-neon hover:bg-[#c4e600] disabled:opacity-50 text-darker font-bold rounded flex items-center space-x-1 shrink-0">
+                                <i class="ph ph-arrows-clockwise text-sm" :class="esp32Testing ? 'animate-spin' : ''"></i>
+                                <span x-text="esp32Testing ? 'Cek...' : 'Uji'"></span>
+                            </button>
+                        </div>
+                        <div class="flex items-center justify-between text-[11px] text-gray-400 pt-0.5">
+                            <span class="truncate pr-2" :class="esp32Error ? 'text-red-400' : (esp32Connected ? 'text-green-400' : 'text-gray-400')" x-text="esp32Status || 'Ketik IP ESP32-CAM (misal: 192.168.1.50)'"></span>
+                            <button type="button" @click="refreshEsp32Stream()" class="text-neon hover:underline shrink-0 text-[11px] flex items-center">
+                                <i class="ph ph-arrow-clockwise mr-0.5"></i> Reload
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- Stage Kamera Kiosk -->
                     <div class="kiosk-video-stage mb-3">
-                        <video id="kioskVideo" autoplay muted playsinline></video>
+                        <!-- Webcam Video -->
+                        <video id="kioskVideo" x-show="cameraSource === 'webcam'" autoplay muted playsinline></video>
+
+                        <!-- ESP32-CAM Stream Image -->
+                        <div x-show="cameraSource === 'esp32cam'" class="w-full h-full relative flex items-center justify-center bg-black">
+                            <img id="kioskEsp32Image" :src="esp32StreamSrc"
+                                x-show="esp32StreamSrc && !esp32Error"
+                                x-on:load="onEsp32ImageLoad()"
+                                x-on:error="onEsp32ImageError()"
+                                class="kiosk-stream-img" alt="ESP32-CAM Stream">
+                            <div x-show="!esp32StreamSrc || esp32Error" class="p-4 text-center text-gray-400">
+                                <i class="ph ph-broadcast text-3xl text-neon mb-1.5 block"></i>
+                                <p class="text-xs font-semibold text-white">ESP32-CAM Siap Digunakan</p>
+                                <p class="text-[11px] text-gray-500 mt-1 max-w-[220px] mx-auto" x-text="esp32Ip ? 'Gagal menampilkan stream dari ' + esp32Ip + '. Periksa koneksi IP/Wi-Fi.' : 'Masukkan IP ESP32-CAM pada kotak di atas.'"></p>
+                            </div>
+                        </div>
+
                         <div class="kiosk-guide-frame" :class="scanning ? 'scanning' : ''"></div>
                         <div class="scan-laser-line" x-show="scanning" style="display: none;"></div>
 
                         <!-- Badge Status -->
                         <div class="absolute top-2.5 left-2.5 flex items-center space-x-1.5 bg-black/70 border border-gray-700/60 rounded-md px-2 py-1 text-[11px] text-gray-300 font-mono">
-                            <span class="w-2 h-2 rounded-full" :class="cameraReady ? 'bg-green-400' : 'bg-red-400'"></span>
-                            <span x-text="cameraReady ? 'Kamera Siap' : 'Menyiapkan Kamera...'"></span>
+                            <template x-if="cameraSource === 'webcam'">
+                                <span class="flex items-center space-x-1.5">
+                                    <span class="w-2 h-2 rounded-full" :class="cameraReady ? 'bg-green-400' : 'bg-red-400'"></span>
+                                    <span x-text="cameraReady ? 'Webcam Siap' : 'Menyiapkan Webcam...'"></span>
+                                </span>
+                            </template>
+                            <template x-if="cameraSource === 'esp32cam'">
+                                <span class="flex items-center space-x-1.5">
+                                    <span class="w-2 h-2 rounded-full" :class="esp32Connected ? 'bg-green-400' : (esp32Ip ? 'bg-amber-400' : 'bg-red-400')"></span>
+                                    <span x-text="esp32Connected ? 'ESP32-CAM Aktif' : (esp32Ip ? 'Menghubungkan...' : 'IP Belum Diisi')"></span>
+                                </span>
+                            </template>
                         </div>
 
                         <!-- Indicator Scanning -->
@@ -221,7 +299,7 @@
 
                     <!-- Kiosk Action Controls -->
                     <div class="space-y-2">
-                        <button type="button" @click="triggerFaceCheckin()" :disabled="scanning || !cameraReady"
+                        <button type="button" @click="triggerFaceCheckin()" :disabled="scanning || (cameraSource === 'webcam' ? !cameraReady : !esp32Ip)"
                             class="w-full bg-neon hover:bg-[#c4e600] disabled:opacity-50 text-darker font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2 shadow-[0_0_15px_rgba(224,255,0,0.15)]">
                             <i class="ph ph-scan text-xl"></i>
                             <span x-text="scanning ? 'Sedang Memverifikasi...' : 'Mulai Check-in Wajah'"></span>
@@ -399,10 +477,43 @@
             </header>
 
             <main class="flex-1 flex flex-col lg:flex-row items-center justify-center gap-10 py-6 max-w-5xl mx-auto w-full">
-                <!-- Video Stage -->
+                <!-- Video / Stream Stage -->
                 <div class="w-full max-w-md">
+                    <!-- Switcher in Fullscreen -->
+                    <div class="flex items-center justify-between mb-3 bg-dark/80 p-1.5 rounded-lg border border-gray-700 text-xs">
+                        <span class="text-gray-400 font-medium pl-1 flex items-center">
+                            <i class="ph ph-camera mr-1 text-neon"></i> Sumber Kamera:
+                        </span>
+                        <div class="flex space-x-1">
+                            <button type="button" @click="setCameraSource('webcam')"
+                                :class="cameraSource === 'webcam' ? 'bg-neon text-darker font-bold shadow-sm' : 'text-gray-400 hover:text-white'"
+                                class="px-2.5 py-1 rounded-md transition flex items-center text-xs">
+                                <i class="ph ph-video-camera mr-1"></i> Webcam
+                            </button>
+                            <button type="button" @click="setCameraSource('esp32cam')"
+                                :class="cameraSource === 'esp32cam' ? 'bg-neon text-darker font-bold shadow-sm' : 'text-gray-400 hover:text-white'"
+                                class="px-2.5 py-1 rounded-md transition flex items-center text-xs">
+                                <i class="ph ph-broadcast mr-1"></i> ESP32-CAM
+                            </button>
+                        </div>
+                    </div>
+
                     <div class="kiosk-video-stage shadow-[0_0_40px_rgba(0,0,0,0.8)]" style="aspect-ratio: 1/1;">
-                        <video id="fullscreenVideo" autoplay muted playsinline></video>
+                        <video id="fullscreenVideo" x-show="cameraSource === 'webcam'" autoplay muted playsinline></video>
+
+                        <div x-show="cameraSource === 'esp32cam'" class="w-full h-full relative flex items-center justify-center bg-black">
+                            <img id="fullscreenEsp32Image" :src="esp32StreamSrc"
+                                x-show="esp32StreamSrc && !esp32Error"
+                                x-on:load="onEsp32ImageLoad()"
+                                x-on:error="onEsp32ImageError()"
+                                class="kiosk-stream-img" alt="ESP32-CAM Stream">
+                            <div x-show="!esp32StreamSrc || esp32Error" class="p-6 text-center text-gray-400">
+                                <i class="ph ph-broadcast text-4xl text-neon mb-2 block"></i>
+                                <p class="text-sm font-semibold text-white">ESP32-CAM Belum Terhubung</p>
+                                <p class="text-xs text-gray-500 mt-1" x-text="esp32Ip ? 'Gagal memuat stream dari ' + esp32Ip : 'Ketik IP ESP32-CAM pada halaman utama'"></p>
+                            </div>
+                        </div>
+
                         <div class="kiosk-guide-frame" :class="scanning ? 'scanning' : ''"></div>
                         <div class="scan-laser-line" x-show="scanning"></div>
                     </div>
@@ -482,6 +593,7 @@
         function attendanceScanner() {
             return {
                 activeMode: 'id',
+                cameraSource: localStorage.getItem('bisagym_camera_source') || 'webcam', // 'webcam' | 'esp32cam'
                 cameraReady: false,
                 scanning: false,
                 autoScan: false,
@@ -497,6 +609,15 @@
                 buzzerConnected: false,
                 buzzerStatus: 'Buzzer belum tersambung.',
 
+                // ESP32-CAM State
+                esp32Ip: localStorage.getItem('bisagym_esp32_ip') || '',
+                esp32Connected: false,
+                esp32Testing: false,
+                esp32Status: '',
+                esp32StreamSrc: '',
+                esp32Error: false,
+                esp32UseProxy: false,
+
                 init() {
                     // Clock for fullscreen
                     setInterval(() => {
@@ -505,12 +626,158 @@
                         const el = document.getElementById('fullscreenClock');
                         if (el) el.textContent = timeStr;
                     }, 1000);
+
+                    // Restore ESP32 stream if configured
+                    if (this.esp32Ip.trim()) {
+                        this.updateEsp32Url();
+                    }
+                },
+
+                normalizeHost(ipOrUrl) {
+                    if (!ipOrUrl) return '';
+                    let val = ipOrUrl.trim();
+                    if (!/^https?:\/\//i.test(val)) {
+                        val = 'http://' + val;
+                    }
+                    return val.replace(/\/+$/, '');
+                },
+
+                getEsp32StreamUrl() {
+                    if (!this.esp32Ip.trim()) return '';
+                    const base = this.normalizeHost(this.esp32Ip);
+                    if (base.includes('/stream') || base.includes('.mjpg')) {
+                        return base;
+                    }
+                    try {
+                        const u = new URL(base);
+                        if (!u.port || u.port === '80') {
+                            return `${u.protocol}//${u.hostname}:81/stream`;
+                        }
+                        return `${base}/stream`;
+                    } catch (e) {
+                        return `${base}:81/stream`;
+                    }
+                },
+
+                getEsp32ProxyStreamUrl() {
+                    if (!this.esp32Ip.trim()) return '';
+                    const streamUrl = this.getEsp32StreamUrl();
+                    return `{{ route("attendance.esp32-stream") }}?url=${encodeURIComponent(streamUrl)}`;
+                },
+
+                getEsp32CaptureUrl() {
+                    if (!this.esp32Ip.trim()) return '';
+                    const base = this.normalizeHost(this.esp32Ip);
+                    if (base.includes('/capture') || base.endsWith('.jpg')) {
+                        return base;
+                    }
+                    try {
+                        const u = new URL(base);
+                        const portStr = u.port && u.port !== '81' ? `:${u.port}` : '';
+                        return `${u.protocol}//${u.hostname}${portStr}/capture`;
+                    } catch (e) {
+                        return `${base}/capture`;
+                    }
+                },
+
+                updateEsp32Url() {
+                    localStorage.setItem('bisagym_esp32_ip', this.esp32Ip);
+                    if (this.esp32Ip.trim()) {
+                        this.refreshEsp32Stream();
+                    } else {
+                        this.esp32StreamSrc = '';
+                        this.esp32Connected = false;
+                        this.esp32Status = '';
+                        this.esp32Error = false;
+                    }
+                },
+
+                refreshEsp32Stream() {
+                    if (!this.esp32Ip.trim()) return;
+                    this.esp32UseProxy = false;
+                    const url = this.getEsp32StreamUrl();
+                    const sep = url.includes('?') ? '&' : '?';
+                    this.esp32StreamSrc = url + sep + '_t=' + Date.now();
+                    this.esp32Error = false;
+                    this.esp32Status = 'Menghubungkan ke stream ESP32-CAM...';
+                },
+
+                onEsp32ImageLoad() {
+                    this.esp32Connected = true;
+                    this.esp32Error = false;
+                    this.esp32Status = this.esp32UseProxy ? 'Stream ESP32-CAM aktif (via proxy).' : 'Stream ESP32-CAM aktif.';
+                },
+
+                onEsp32ImageError() {
+                    // Jika belum coba proxy, coba lewat proxy Laravel
+                    if (!this.esp32UseProxy && this.esp32Ip.trim()) {
+                        this.esp32UseProxy = true;
+                        const proxyUrl = this.getEsp32ProxyStreamUrl();
+                        const sep = proxyUrl.includes('?') ? '&' : '?';
+                        this.esp32StreamSrc = proxyUrl + (proxyUrl.includes('_t=') ? '' : sep + '_t=' + Date.now());
+                        this.esp32Status = 'Mencoba koneksi via proxy server...';
+                        return;
+                    }
+                    this.esp32Connected = false;
+                    this.esp32Error = true;
+                    this.esp32Status = 'Gagal memuat stream dari ' + this.esp32Ip + '. Periksa IP / Wi-Fi.';
+                },
+
+                async testEsp32Connection() {
+                    if (!this.esp32Ip.trim()) return;
+                    this.esp32Testing = true;
+                    this.esp32Status = 'Menguji koneksi ke ESP32-CAM...';
+                    try {
+                        const res = await fetch('{{ route("attendance.test-esp32") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({ esp32_url: this.getEsp32CaptureUrl() })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            this.esp32Connected = true;
+                            this.esp32Error = false;
+                            this.esp32Status = data.message;
+                            this.refreshEsp32Stream();
+                        } else {
+                            this.esp32Connected = false;
+                            this.esp32Error = true;
+                            this.esp32Status = data.message || 'Gagal tersambung ke ESP32-CAM.';
+                        }
+                    } catch (err) {
+                        this.esp32Connected = false;
+                        this.esp32Error = true;
+                        this.esp32Status = 'Koneksi gagal: ' + err.message;
+                    } finally {
+                        this.esp32Testing = false;
+                    }
+                },
+
+                setCameraSource(source) {
+                    this.cameraSource = source;
+                    localStorage.setItem('bisagym_camera_source', source);
+                    if (this.activeMode === 'face') {
+                        if (source === 'webcam') {
+                            this.$nextTick(() => this.startCamera(this.isFullscreen ? 'fullscreenVideo' : 'kioskVideo'));
+                        } else {
+                            this.stopCamera();
+                            this.refreshEsp32Stream();
+                        }
+                    }
                 },
 
                 setMode(mode) {
                     this.activeMode = mode;
                     if (mode === 'face') {
-                        this.$nextTick(() => this.startCamera('kioskVideo'));
+                        if (this.cameraSource === 'webcam') {
+                            this.$nextTick(() => this.startCamera(this.isFullscreen ? 'fullscreenVideo' : 'kioskVideo'));
+                        } else {
+                            this.refreshEsp32Stream();
+                        }
                     } else {
                         this.stopCamera();
                         this.$nextTick(() => {
@@ -624,53 +891,71 @@
 
                 async triggerFaceCheckin() {
                     if (this.scanning) return;
-                    this.scanning = true;
 
-                    const video = this.isFullscreen ? document.getElementById('fullscreenVideo') : document.getElementById('kioskVideo');
-                    if (!video || !this.cameraReady) {
-                        this.scanning = false;
-                        return;
-                    }
-
-                    // Capture frame via canvas
-                    const canvas = document.createElement('canvas');
-                    canvas.width = video.videoWidth || 640;
-                    canvas.height = video.videoHeight || 480;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-                    canvas.toBlob(async (blob) => {
-                        if (!blob) {
-                            this.scanning = false;
+                    if (this.cameraSource === 'webcam') {
+                        const video = this.isFullscreen ? document.getElementById('fullscreenVideo') : document.getElementById('kioskVideo');
+                        if (!video || !this.cameraReady) {
+                            alert('Kamera webcam belum siap.');
                             return;
                         }
 
-                        const formData = new FormData();
-                        formData.append('frame', blob, 'checkin.jpg');
+                        this.scanning = true;
 
-                        try {
-                            const res = await fetch('{{ route("attendance.face-checkin") }}', {
-                                method: 'POST',
-                                headers: {
-                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                                    'Accept': 'application/json'
-                                },
-                                body: formData
-                            });
+                        // Capture frame via canvas
+                        const canvas = document.createElement('canvas');
+                        canvas.width = video.videoWidth || 640;
+                        canvas.height = video.videoHeight || 480;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-                            const data = await res.json();
-                            this.handleCheckinResult(data);
-                        } catch (err) {
-                            console.error('Checkin error:', err);
-                            this.handleCheckinResult({
-                                decision: 'DENY',
-                                title: 'Kesalahan Jaringan',
-                                message: 'Tidak dapat menghubungi server. Coba lagi beberapa saat.'
-                            });
-                        } finally {
-                            this.scanning = false;
+                        canvas.toBlob(async (blob) => {
+                            if (!blob) {
+                                this.scanning = false;
+                                return;
+                            }
+
+                            const formData = new FormData();
+                            formData.append('frame', blob, 'checkin.jpg');
+                            await this.sendCheckinRequest(formData);
+                        }, 'image/jpeg', 0.88);
+
+                    } else {
+                        // ESP32-CAM Source
+                        if (!this.esp32Ip.trim()) {
+                            alert('Silakan masukkan alamat IP ESP32-CAM terlebih dahulu.');
+                            return;
                         }
-                    }, 'image/jpeg', 0.88);
+
+                        this.scanning = true;
+                        const formData = new FormData();
+                        formData.append('esp32_url', this.getEsp32CaptureUrl());
+                        await this.sendCheckinRequest(formData);
+                    }
+                },
+
+                async sendCheckinRequest(formData) {
+                    try {
+                        const res = await fetch('{{ route("attendance.face-checkin") }}', {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                                'Accept': 'application/json'
+                            },
+                            body: formData
+                        });
+
+                        const data = await res.json();
+                        this.handleCheckinResult(data);
+                    } catch (err) {
+                        console.error('Checkin error:', err);
+                        this.handleCheckinResult({
+                            decision: 'DENY',
+                            title: 'Kesalahan Jaringan',
+                            message: 'Tidak dapat menghubungi server atau kamera. Coba lagi beberapa saat.'
+                        });
+                    } finally {
+                        this.scanning = false;
+                    }
                 },
 
                 async handleCheckinResult(data) {
@@ -714,13 +999,15 @@
                         badgeHtml = `<span class="px-2.5 py-1 text-xs rounded-md bg-red-500/10 text-red-400 border border-red-500/30 font-mono font-medium inline-flex items-center"><i class="ph ph-x-circle mr-1 text-sm"></i> Expired</span>`;
                     }
 
+                    const methodText = this.cameraSource === 'esp32cam' ? 'ESP32-CAM AI' : 'Webcam AI';
+
                     const tr = document.createElement('tr');
                     tr.className = 'hover:bg-dark/50 transition-colors bg-green-500/5 animate-pulse';
                     tr.innerHTML = `
                         <td class="px-6 py-4"><span class="font-mono text-neon font-bold">${member.attendance_time || 'Baru Saja'}</span></td>
                         <td class="px-6 py-4"><p class="font-medium text-white">${member.name}</p><p class="text-xs text-gray-500 font-mono">${member.member_id}</p></td>
                         <td class="px-6 py-4">${badgeHtml}</td>
-                        <td class="px-6 py-4 text-gray-400 text-xs"><i class="ph ph-scan-face text-neon mr-1"></i> Kiosk Wajah AI</td>
+                        <td class="px-6 py-4 text-gray-400 text-xs"><i class="ph ph-scan-face text-neon mr-1"></i> ${methodText}</td>
                     `;
                     tbody.prepend(tr);
                 },
@@ -766,7 +1053,11 @@
                             if (el.requestFullscreen) {
                                 el.requestFullscreen().catch(() => {});
                             }
-                            this.startCamera('fullscreenVideo');
+                            if (this.cameraSource === 'webcam') {
+                                this.startCamera('fullscreenVideo');
+                            } else {
+                                this.refreshEsp32Stream();
+                            }
                         });
                     }
                 },
@@ -777,7 +1068,13 @@
                         document.exitFullscreen().catch(() => {});
                     }
                     this.setMode('face');
-                    this.$nextTick(() => this.startCamera('kioskVideo'));
+                    this.$nextTick(() => {
+                        if (this.cameraSource === 'webcam') {
+                            this.startCamera('kioskVideo');
+                        } else {
+                            this.refreshEsp32Stream();
+                        }
+                    });
                 }
             };
         }

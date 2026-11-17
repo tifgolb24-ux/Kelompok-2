@@ -10,7 +10,7 @@ class Settings(BaseSettings):
         env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="ignore"
     )
 
-    app_env: Literal["development", "test", "production"] = "development"
+    app_env: Literal["development", "test", "production", "local"] = "development"
     app_name: str = "Gym Face Access"
     app_timezone: str = "Asia/Jakarta"
     secret_key: str = "development-only-change-me"

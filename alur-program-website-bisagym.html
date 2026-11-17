@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alur Program – Website BisaGym</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    body { font-family: 'Times New Roman', Times, serif; line-height: 1.8; }
+    h1, h2, h3, h4 { font-family: 'Arial', sans-serif; }
+    p { text-align: justify; }
+    .section-num { color: #1e3a5f; font-weight: bold; }
+    @media print {
+      body { background: white !important; color: black !important; font-size: 12pt; }
+      .no-print { display: none !important; }
+      .page-break { page-break-before: always; }
+      .shadow-md, .shadow-lg { box-shadow: none !important; }
+      .rounded-2xl { border-radius: 0 !important; }
+      .bg-gray-100 { background: white !important; }
+      .bg-white { background: white !important; }
+      a { color: black !important; text-decoration: none !important; }
+      .cover-bg { background: #1e3a5f !important; color: white !important; }
+    }
+    .cover-bg { background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%); }
+    .indent { text-indent: 2em; }
+    .step-box { border-left: 4px solid #2563eb; background: #f0f6ff; }
+  </style>
+</head>
+<body class="bg-gray-100 antialiased">
+
+  <!-- Tombol Cetak -->
+  <div class="no-print fixed top-4 right-4 z-50">
+    <button onclick="window.print()" class="bg-blue-700 hover:bg-blue-800 text-white px-5 py-2 rounded-lg font-semibold shadow-lg transition text-sm">
+      🖨️ Cetak / Simpan PDF
+    </button>
+  </div>
+
+  <div class="max-w-4xl mx-auto py-10 px-4">
+
+    <!-- ============================================================ -->
+    <!--                         COVER                               -->
+    <!-- ============================================================ -->
+    <div class="cover-bg text-white rounded-2xl shadow-lg p-12 mb-10 text-center">
+      <p class="text-sm uppercase tracking-widest text-blue-200 mb-2">Dokumentasi Teknis</p>
+      <h1 class="text-3xl font-extrabold mb-3">ALUR PROGRAM</h1>
+      <h2 class="text-xl font-bold mb-1">Website BisaGym</h2>
+      <h3 class="text-base font-medium text-blue-200 mb-6">Sistem Manajemen Gym Berbasis Web dengan Kecerdasan Buatan Biometrik Wajah</h3>
+      <div class="border-t border-blue-400 pt-6 text-sm text-blue-200 space-y-1">
+        <p>Teknologi: Laravel 11 (PHP 8.3) · FastAPI (Python 3.13) · OpenCV YuNet + SFace · MySQL · SQLite</p>
+        <p>Repository: github.com/anugrah-1-dev/CitradanAI</p>
+        <p>Tanggal Dokumen: November 2026</p>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!--                   DAFTAR ISI                                -->
+    <!-- ============================================================ -->
+    <div class="bg-white rounded-2xl shadow-md p-8 mb-8">
+      <h2 class="text-lg font-extrabold text-gray-800 border-b-2 border-blue-600 pb-2 mb-4">DAFTAR ISI</h2>
+      <ol class="list-none space-y-1 text-sm text-gray-700">
+        <li class="flex gap-2"><span class="font-bold text-blue-700 w-6">1.</span><span>Gambaran Umum Sistem</span></li>
+        <li class="flex gap-2"><span class="font-bold text-blue-700 w-6">2.</span><span>Arsitektur Aplikasi</span></li>
+        <li class="flex gap-2"><span class="font-bold text-blue-700 w-6">3.</span><span>Alur Autentikasi dan Hak Akses Pengguna</span></li>
+        <li class="flex gap-2"><span class="font-bold text-blue-700 w-6">4.</span><span>Alur Pendaftaran Member</span></li>
+        <li class="flex gap-2"><span class="font-bold text-blue-700 w-6">5.</span><span>Alur Pencatatan Absensi Member</span></li>
+        <li class="flex gap-2"><span class="font-bold text-blue-700 w-6">6.</span><span>Alur Pendaftaran Wajah (Face Enrollment) dengan AI</span></li>
+        <li class="flex gap-2"><span class="font-bold text-blue-700 w-6">7.</span><span>Alur Kasir dan Pembayaran Transaksi</span></li>
+        <li class="flex gap-2"><span class="font-bold text-blue-700 w-6">8.</span><span>Alur Point of Sale (POS) Snack</span></li>
+        <li class="flex gap-2"><span class="font-bold text-blue-700 w-6">9.</span><span>Alur Laporan Keuangan dan Shift</span></li>
+        <li class="flex gap-2"><span class="font-bold text-blue-700 w-6">10.</span><span>Alur Manajemen Karyawan</span></li>
+        <li class="flex gap-2"><span class="font-bold text-blue-700 w-6">11.</span><span>Alur Streaming Kamera dan Deteksi Wajah Real-time</span></li>
+        <li class="flex gap-2"><span class="font-bold text-blue-700 w-6">12.</span><span>Alur Manajemen Perangkat Kiosk</span></li>
+        <li class="flex gap-2"><span class="font-bold text-blue-700 w-6">13.</span><span>Struktur Database</span></li>
+      </ol>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- BAB 1 – GAMBARAN UMUM                                       -->
+    <!-- ============================================================ -->
+    <div class="bg-white rounded-2xl shadow-md p-8 mb-8">
+      <h2 class="text-lg font-extrabold text-blue-800 border-b-2 border-blue-600 pb-2 mb-5">1. Gambaran Umum Sistem</h2>
+
+      <p class="indent text-gray-700 mb-4">
+        Website BisaGym adalah sistem manajemen gym berbasis web yang dirancang untuk membantu pengelolaan operasional pusat kebugaran secara terpadu dan efisien. Sistem ini mencakup berbagai aspek manajemen gym, mulai dari pendaftaran anggota, pencatatan kehadiran, pembayaran, pengelolaan karyawan, hingga laporan keuangan. Keunggulan utama sistem ini terletak pada integrasi teknologi kecerdasan buatan (AI) biometrik pengenalan wajah yang memungkinkan pencatatan kehadiran anggota secara otomatis tanpa memerlukan kartu fisik atau input manual.
+      </p>
+      <p class="indent text-gray-700 mb-4">
+        Sistem dibangun di atas dua lapisan aplikasi yang saling terintegrasi. Lapisan pertama adalah aplikasi web utama yang dikembangkan menggunakan <em>framework</em> Laravel 11 berbasis PHP 8.3, berfungsi sebagai antarmuka bisnis utama yang menangani seluruh logika manajemen gym dan interaksi pengguna. Lapisan kedua adalah layanan API biometrik yang dikembangkan menggunakan FastAPI berbasis Python 3.13, berfungsi sebagai mesin kecerdasan buatan yang memproses deteksi dan pengenalan wajah menggunakan model <em>deep learning</em> YuNet dan SFace dari OpenCV.
+      </p>
+      <p class="indent text-gray-700">
+        Dengan arsitektur dua lapisan ini, Website BisaGym mampu menawarkan pengalaman pengguna yang lengkap: staf dapat mengelola seluruh operasional gym melalui antarmuka web yang intuitif, sementara di balik layar sistem AI bekerja secara otomatis untuk memverifikasi identitas anggota berdasarkan ciri biometrik wajah mereka.
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- BAB 2 – ARSITEKTUR                                          -->
+    <!-- ============================================================ -->
+    <div class="bg-white rounded-2xl shadow-md p-8 mb-8">
+      <h2 class="text-lg font-extrabold text-blue-800 border-b-2 border-blue-600 pb-2 mb-5">2. Arsitektur Aplikasi</h2>
+
+      <p class="indent text-gray-700 mb-4">
+        Arsitektur Website BisaGym menggunakan pendekatan <em>microservice</em> ringan, di mana aplikasi web utama (Laravel) dan layanan AI biometrik (FastAPI) berjalan sebagai proses terpisah namun berkomunikasi melalui protokol HTTP internal.
+      </p>
+
+      <h3 class="font-bold text-gray-800 mt-5 mb-2">2.1 Lapisan Aplikasi Web (Laravel)</h3>
+      <p class="indent text-gray-700 mb-4">
+        Aplikasi Laravel berjalan pada port 8000 dan merupakan titik masuk utama seluruh pengguna sistem. Aplikasi ini mengelola database MySQL yang menyimpan data bisnis seperti informasi anggota, transaksi, keuangan, dan data karyawan. Laravel menggunakan pola arsitektur MVC (<em>Model–View–Controller</em>) di mana setiap fitur dikelola oleh kelas <em>Controller</em> tersendiri, data direpresentasikan oleh kelas <em>Model</em> Eloquent, dan tampilan dirender menggunakan <em>template engine</em> Blade yang dikombinasikan dengan Tailwind CSS untuk menghasilkan antarmuka yang responsif dan modern.
+      </p>
+
+      <h3 class="font-bold text-gray-800 mt-5 mb-2">2.2 Lapisan API Biometrik (FastAPI + Python)</h3>
+      <p class="indent text-gray-700 mb-4">
+        Layanan API biometrik berjalan pada port 8001 di dalam direktori <code class="bg-gray-100 px-1 rounded text-sm">Website-BisaGym/bisagym-api/</code>. Layanan ini menggunakan model <em>deep learning</em> berbasis ONNX yang dijalankan melalui OpenCV 4.13: model YuNet untuk deteksi wajah dan model SFace untuk ekstraksi ciri wajah (<em>face embedding</em>). Data biometrik disimpan dalam database SQLite terpisah (<code class="bg-gray-100 px-1 rounded text-sm">gym.db</code>) untuk menjaga isolasi antara data bisnis dan data biometrik yang sensitif.
+      </p>
+
+      <h3 class="font-bold text-gray-800 mt-5 mb-2">2.3 Komunikasi Antar Lapisan</h3>
+      <p class="indent text-gray-700 mb-4">
+        Komunikasi antara Laravel dan FastAPI dilakukan melalui kelas layanan <code class="bg-gray-100 px-1 rounded text-sm">FaceRecognitionApi.php</code> yang berperan sebagai <em>wrapper</em> atau adaptor. Setiap kali fitur yang berkaitan dengan biometrik dipanggil oleh pengguna melalui antarmuka web, kelas ini akan menerjemahkan permintaan tersebut menjadi panggilan HTTP ke API Python, mengirimkan data gambar dalam format Base64, menerima respons JSON, dan meneruskan hasilnya ke <em>Controller</em> Laravel yang memanggilnya. Mekanisme autentikasi antara Laravel dan FastAPI menggunakan token JWT yang dikelola secara internal.
+      </p>
+
+      <div class="step-box rounded-lg p-4 text-sm text-gray-700 mb-2">
+        <strong>Ringkasan teknologi yang digunakan:</strong>
+        <ul class="list-disc list-inside mt-2 space-y-1">
+          <li><strong>Web Framework:</strong> Laravel 11 (PHP 8.3) — routing, MVC, autentikasi, ORM Eloquent</li>
+          <li><strong>AI Framework:</strong> FastAPI (Python 3.13) + OpenCV 4.13 — deteksi dan pengenalan wajah</li>
+          <li><strong>Model AI:</strong> YuNet (deteksi) + SFace (pengenalan) dalam format ONNX</li>
+          <li><strong>Database Bisnis:</strong> MySQL — member, transaksi, keuangan, karyawan</li>
+          <li><strong>Database Biometrik:</strong> SQLite (gym.db) — vektor wajah terenkripsi</li>
+          <li><strong>Frontend:</strong> Blade Templating + Tailwind CSS</li>
+          <li><strong>Autentikasi Web:</strong> Laravel Breeze (session-based)</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- BAB 3 – AUTENTIKASI                                         -->
+    <!-- ============================================================ -->
+    <div class="bg-white rounded-2xl shadow-md p-8 mb-8 page-break">
+      <h2 class="text-lg font-extrabold text-blue-800 border-b-2 border-blue-600 pb-2 mb-5">3. Alur Autentikasi dan Hak Akses Pengguna</h2>
+
+      <p class="indent text-gray-700 mb-4">
+        Setiap pengguna yang ingin mengakses sistem diwajibkan untuk masuk (<em>login</em>) terlebih dahulu. Ketika pengguna membuka alamat utama sistem melalui browser, sistem secara otomatis mengalihkan ke halaman login (<code class="bg-gray-100 px-1 rounded text-sm">/login</code>). Pengguna memasukkan alamat email dan kata sandi yang telah terdaftar dalam database sistem.
+      </p>
+      <p class="indent text-gray-700 mb-4">
+        Sistem kemudian memvalidasi kredensial tersebut melalui <em>AuthController</em>. Apabila email atau kata sandi tidak sesuai, sistem akan menampilkan pesan kesalahan dan pengguna diminta memasukkan ulang datanya. Apabila kredensial valid, sistem membuat sesi (<em>session</em>) yang aman untuk pengguna tersebut dan mengalihkannya ke halaman dasbor (<code class="bg-gray-100 px-1 rounded text-sm">/dashboard</code>).
+      </p>
+      <p class="indent text-gray-700 mb-4">
+        Website BisaGym menerapkan sistem kontrol akses berbasis peran (<em>Role-Based Access Control / RBAC</em>) melalui mekanisme <em>middleware</em> Laravel. Setiap pengguna memiliki peran yang menentukan menu dan fitur apa saja yang dapat diaksesnya:
+      </p>
+      <ul class="list-disc list-inside text-gray-700 space-y-2 mb-4 ml-4 text-sm">
+        <li><strong>Developer</strong> — memiliki akses penuh ke seluruh fitur sistem, termasuk manajemen akun pengguna, penghapusan transaksi, dan log aktivitas sistem.</li>
+        <li><strong>Admin</strong> — dapat mengelola seluruh operasional gym seperti manajemen anggota, karyawan, paket keanggotaan, diskon, dan laporan keuangan.</li>
+        <li><strong>Kasir</strong> — memiliki akses ke fitur kasir, point of sale snack, laporan shift, dan pengeluaran.</li>
+        <li><strong>Penjaga</strong> — dapat mengakses fitur absensi anggota, streaming kamera, dan manajemen perangkat kiosk.</li>
+      </ul>
+      <p class="indent text-gray-700">
+        Setiap rute yang memerlukan autentikasi dilindungi oleh <em>middleware</em> <code class="bg-gray-100 px-1 rounded text-sm">auth</code>, sementara rute yang memerlukan peran tertentu dilindungi oleh <em>middleware</em> <code class="bg-gray-100 px-1 rounded text-sm">role:nama_peran</code>. Apabila pengguna mencoba mengakses rute yang tidak sesuai dengan perannya, sistem akan menolak akses dan menampilkan halaman kesalahan 403.
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- BAB 4 – PENDAFTARAN MEMBER                                  -->
+    <!-- ============================================================ -->
+    <div class="bg-white rounded-2xl shadow-md p-8 mb-8">
+      <h2 class="text-lg font-extrabold text-blue-800 border-b-2 border-blue-600 pb-2 mb-5">4. Alur Pendaftaran Member</h2>
+
+      <p class="indent text-gray-700 mb-4">
+        Sistem menyediakan dua jalur pendaftaran anggota gym, yaitu pendaftaran mandiri oleh calon anggota melalui halaman publik dan pendaftaran yang dilakukan oleh staf gym melalui panel administrasi.
+      </p>
+
+      <h3 class="font-bold text-gray-800 mt-5 mb-2">4.1 Pendaftaran Mandiri oleh Calon Anggota (Publik)</h3>
+      <p class="indent text-gray-700 mb-4">
+        Calon anggota dapat mendaftarkan diri secara mandiri melalui halaman <code class="bg-gray-100 px-1 rounded text-sm">/pendaftaran</code> tanpa perlu masuk ke sistem. Halaman ini dikelola oleh <em>PublicRegistrationController</em> dan menampilkan formulir yang meminta data pribadi calon anggota seperti nama lengkap, alamat email, nomor telepon, dan foto identitas. Setelah formulir dikirimkan, sistem menyimpan data tersebut ke dalam database dengan status keanggotaan <em>pending</em> (menunggu verifikasi). Staf gym kemudian akan memverifikasi data dan mengaktifkan keanggotaan melalui panel administrasi.
+      </p>
+
+      <h3 class="font-bold text-gray-800 mt-5 mb-2">4.2 Pendaftaran oleh Staf Gym</h3>
+      <p class="indent text-gray-700 mb-4">
+        Staf gym yang telah masuk ke sistem dapat mendaftarkan anggota baru melalui menu Anggota (<code class="bg-gray-100 px-1 rounded text-sm">/members/create</code>). Proses ini dikelola oleh <em>MemberController</em>. Staf memasukkan data lengkap anggota, memilih paket keanggotaan yang diinginkan, mengunggah foto anggota, dan menentukan tanggal mulai keanggotaan. Sistem kemudian membuat catatan anggota baru beserta transaksi pembayaran yang menunggu pelunasan.
+      </p>
+      <p class="indent text-gray-700 mb-4">
+        Proses pembayaran dilanjutkan melalui menu Kasir. Kasir membuka halaman <code class="bg-gray-100 px-1 rounded text-sm">/cashier/member</code>, mencari anggota berdasarkan nama atau ID, memilih transaksi yang menunggu pembayaran, memasukkan jumlah uang yang diterima, dan menyelesaikan pembayaran. Setelah pembayaran dikonfirmasi, status keanggotaan anggota otomatis diubah menjadi aktif dan sistem menghasilkan kartu anggota elektronik (<em>e-card</em>) yang dapat diakses melalui <code class="bg-gray-100 px-1 rounded text-sm">/members/{id}/ecard</code>.
+      </p>
+
+      <h3 class="font-bold text-gray-800 mt-5 mb-2">4.3 Perpanjangan Keanggotaan</h3>
+      <p class="indent text-gray-700">
+        Anggota yang masa keanggotaannya akan habis atau telah habis dapat memperpanjang melalui menu Anggota. Staf membuka detail anggota yang bersangkutan, memilih menu perpanjangan (<em>renewal</em>), menentukan paket baru yang diinginkan, dan membuat transaksi perpanjangan. Proses pembayaran dilakukan dengan cara yang sama seperti pendaftaran baru melalui menu Kasir. Setelah lunas, tanggal berakhir keanggotaan secara otomatis diperbarui sesuai durasi paket yang dipilih.
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- BAB 5 – ABSENSI MEMBER                                      -->
+    <!-- ============================================================ -->
+    <div class="bg-white rounded-2xl shadow-md p-8 mb-8 page-break">
+      <h2 class="text-lg font-extrabold text-blue-800 border-b-2 border-blue-600 pb-2 mb-5">5. Alur Pencatatan Absensi Member</h2>
+
+      <p class="indent text-gray-700 mb-4">
+        Pencatatan kehadiran anggota gym dapat dilakukan melalui dua mode yang tersedia pada halaman Scan Absensi (<code class="bg-gray-100 px-1 rounded text-sm">/attendance</code>), yaitu mode pemindaian ID secara manual dan mode kiosk wajah berbasis kecerdasan buatan.
+      </p>
+
+      <h3 class="font-bold text-gray-800 mt-5 mb-2">5.1 Mode Pemindaian ID (Manual)</h3>
+      <p class="indent text-gray-700 mb-4">
+        Pada mode ini, staf penjaga membuka tab <em>"Scan ID"</em> pada halaman absensi. Anggota gym menyerahkan kartu anggota mereka untuk dipindai menggunakan pemindai barcode, atau staf dapat mengetikkan ID anggota secara manual pada kolom pencarian yang tersedia. Setelah ID dikirimkan melalui formulir (<code class="bg-gray-100 px-1 rounded text-sm">POST /attendance</code>), sistem melalui <em>AttendanceController@store</em> akan mencari data anggota di database, memeriksa apakah keanggotaan masih aktif dan belum melewati tanggal berakhir, serta mencatat kehadiran ke tabel <code class="bg-gray-100 px-1 rounded text-sm">member_attendances</code> dengan <em>timestamp</em> saat itu. Apabila keanggotaan tidak aktif atau telah kedaluwarsa, sistem menampilkan notifikasi peringatan kepada staf.
+      </p>
+
+      <h3 class="font-bold text-gray-800 mt-5 mb-2">5.2 Mode Kiosk Wajah AI (Otomatis)</h3>
+      <p class="indent text-gray-700 mb-4">
+        Mode ini memungkinkan pencatatan absensi dilakukan secara mandiri oleh anggota hanya dengan berdiri di depan kamera tanpa memerlukan bantuan staf. Ketika tab <em>"Kiosk Wajah AI"</em> diaktifkan, tampilan beralih ke mode layar penuh (<em>fullscreen</em>) yang menampilkan umpan video kamera secara langsung. Sistem secara otomatis mengirimkan <em>frame</em> video ke server setiap dua detik dalam format gambar Base64 melalui permintaan AJAX ke <code class="bg-gray-100 px-1 rounded text-sm">POST /attendance/face-checkin</code>.
+      </p>
+      <p class="indent text-gray-700 mb-4">
+        Permintaan ini diterima oleh <em>AttendanceController@faceCheckin</em> yang selanjutnya meneruskan data gambar ke layanan API biometrik melalui kelas <em>FaceRecognitionApi</em>. API biometrik pada port 8001 memproses gambar menggunakan model YuNet untuk mendeteksi keberadaan wajah dalam gambar, kemudian menggunakan model SFace untuk mengekstrak vektor ciri wajah (<em>face embedding</em>) berukuran 128 dimensi. Vektor ini dibandingkan dengan seluruh data vektor wajah anggota yang telah terdaftar sebelumnya menggunakan metrik <em>cosine similarity</em>. Apabila tingkat kemiripan melebihi ambang batas yang ditentukan, sistem mengidentifikasi anggota yang bersangkutan dan mengembalikan ID anggota tersebut ke Laravel.
+      </p>
+      <p class="indent text-gray-700">
+        Setelah identitas anggota berhasil diverifikasi, Laravel mencatat kehadiran anggota tersebut secara otomatis ke database. Antarmuka kiosk menampilkan nama anggota beserta pesan selamat datang, membunyikan umpan balik audio, dan mereset tampilan untuk siap menerima anggota berikutnya. Seluruh proses berlangsung dalam waktu kurang dari tiga detik.
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- BAB 6 – FACE ENROLLMENT                                     -->
+    <!-- ============================================================ -->
+    <div class="bg-white rounded-2xl shadow-md p-8 mb-8">
+      <h2 class="text-lg font-extrabold text-blue-800 border-b-2 border-blue-600 pb-2 mb-5">6. Alur Pendaftaran Wajah (Face Enrollment) dengan AI</h2>
+
+      <p class="indent text-gray-700 mb-4">
+        Sebelum seorang anggota dapat menggunakan fitur kiosk wajah AI untuk absensi, wajah anggota tersebut harus terlebih dahulu didaftarkan ke dalam sistem melalui proses <em>face enrollment</em>. Proses ini dilakukan oleh staf melalui menu Pendaftaran Wajah (<code class="bg-gray-100 px-1 rounded text-sm">/face-enrollment</code>) dan terdiri dari empat tahapan utama.
+      </p>
+
+      <h3 class="font-bold text-gray-800 mt-5 mb-2">6.1 Pemilihan Anggota</h3>
+      <p class="indent text-gray-700 mb-4">
+        Staf membuka halaman pendaftaran wajah yang dikelola oleh <em>FaceEnrollmentController@index</em>. Halaman ini menampilkan daftar seluruh anggota gym beserta status pendaftaran wajah mereka, apakah sudah terdaftar, belum terdaftar, atau sedang dalam proses pendaftaran. Staf memilih anggota yang ingin didaftarkan wajahnya dengan mengklik tombol yang tersedia.
+      </p>
+
+      <h3 class="font-bold text-gray-800 mt-5 mb-2">6.2 Inisiasi Sesi Pendaftaran</h3>
+      <p class="indent text-gray-700 mb-4">
+        Setelah anggota dipilih, staf memulai sesi pendaftaran dengan mengirimkan permintaan ke <code class="bg-gray-100 px-1 rounded text-sm">POST /face-enrollment/{member}/start</code>. <em>FaceEnrollmentController@start</em> meneruskan permintaan ini ke API biometrik melalui <em>FaceRecognitionApi</em>. API biometrik membuat sesi pendaftaran baru dan mengembalikan token sesi unik (<em>enrollment_token</em>) yang berfungsi sebagai penanda sesi pendaftaran yang sedang berlangsung. Token ini disimpan sementara untuk digunakan pada tahap pengambilan sampel berikutnya.
+      </p>
+
+      <h3 class="font-bold text-gray-800 mt-5 mb-2">6.3 Pengambilan Sampel Foto Wajah</h3>
+      <p class="indent text-gray-700 mb-4">
+        Tahapan inti dari proses pendaftaran adalah pengambilan tiga sampel foto wajah anggota dengan pose yang berbeda. Antarmuka menampilkan panduan berupa bingkai oval di layar kamera untuk membantu anggota memposisikan wajah dengan tepat. Ketiga pose yang diperlukan adalah: pose menghadap lurus ke depan (frontal), pose sedikit menoleh ke kiri, dan pose sedikit menoleh ke kanan.
+      </p>
+      <p class="indent text-gray-700 mb-4">
+        Untuk setiap pose, staf atau anggota menekan tombol pengambilan gambar. Gambar diambil dari umpan kamera, dikonversi ke format Base64, dan dikirimkan ke <code class="bg-gray-100 px-1 rounded text-sm">POST /face-enrollment/{member}/samples</code> bersama dengan token sesi yang diperoleh pada tahap sebelumnya. API biometrik kemudian menjalankan serangkaian pemeriksaan kualitas gambar sebelum menerimanya sebagai sampel yang valid.
+      </p>
+      <p class="indent text-gray-700 mb-4">
+        Pemeriksaan kualitas yang dilakukan oleh API biometrik meliputi: verifikasi bahwa setidaknya satu wajah terdeteksi dalam gambar (<em>NO_FACE</em>), pemeriksaan bahwa wajah tidak terlalu kecil atau terlalu jauh dari kamera (<em>FACE_TOO_SMALL</em>), analisis ketajaman gambar untuk memastikan tidak buram (<em>IMAGE_TOO_BLURRY</em>), evaluasi pencahayaan untuk memastikan tidak terlalu gelap atau terlalu terang (<em>BAD_EXPOSURE</em>), serta deteksi bahwa hanya ada satu wajah dalam frame (<em>MULTIPLE_FACES</em>). Jika gambar tidak memenuhi standar kualitas, sistem menampilkan pesan kesalahan dalam bahasa Indonesia yang informatif dan meminta pengambilan ulang untuk pose tersebut.
+      </p>
+
+      <h3 class="font-bold text-gray-800 mt-5 mb-2">6.4 Penyelesaian Pendaftaran</h3>
+      <p class="indent text-gray-700 mb-4">
+        Setelah ketiga sampel berhasil dikumpulkan, staf menekan tombol selesai yang mengirimkan permintaan ke <code class="bg-gray-100 px-1 rounded text-sm">POST /face-enrollment/{member}/complete</code>. API biometrik kemudian memproses ketiga sampel tersebut: mengekstrak vektor ciri wajah (<em>face embedding</em>) berukuran 128 dimensi dari setiap sampel menggunakan model SFace, dan menyimpan rata-rata atau representasi terbaik dari ketiga vektor tersebut ke dalam database SQLite <code class="bg-gray-100 px-1 rounded text-sm">gym.db</code> yang terenkripsi. Mulai saat ini, anggota tersebut dapat menggunakan kiosk wajah AI untuk absensi.
+      </p>
+
+      <h3 class="font-bold text-gray-800 mt-5 mb-2">6.5 Penghapusan Data Wajah</h3>
+      <p class="indent text-gray-700">
+        Staf dengan wewenang yang sesuai dapat menghapus data biometrik seorang anggota kapan saja melalui tombol <em>Hapus Data Wajah</em> pada halaman pendaftaran wajah. Permintaan ini dikirimkan ke <code class="bg-gray-100 px-1 rounded text-sm">POST /face-enrollment/{member}/revoke</code> yang akan menghapus seluruh data vektor wajah anggota dari database SQLite. Setelah penghapusan, anggota tersebut tidak dapat lagi menggunakan fitur kiosk wajah AI hingga wajahnya didaftarkan kembali.
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- BAB 7 – KASIR                                               -->
+    <!-- ============================================================ -->
+    <div class="bg-white rounded-2xl shadow-md p-8 mb-8 page-break">
+      <h2 class="text-lg font-extrabold text-blue-800 border-b-2 border-blue-600 pb-2 mb-5">7. Alur Kasir dan Pembayaran Transaksi</h2>
+
+      <p class="indent text-gray-700 mb-4">
+        Fitur kasir pada Website BisaGym dirancang untuk memproses pembayaran transaksi anggota gym, baik untuk pendaftaran keanggotaan baru maupun perpanjangan. Fitur ini dikelola oleh <em>CashierController</em> dan dapat diakses melalui menu Kasir (<code class="bg-gray-100 px-1 rounded text-sm">/cashier/member</code>).
+      </p>
+      <p class="indent text-gray-700 mb-4">
+        Proses pembayaran dimulai dengan kasir membuka halaman kasir dan mencari anggota yang akan membayar. Pencarian dapat dilakukan berdasarkan nama, nomor anggota, atau nomor telepon. Setelah anggota ditemukan, sistem menampilkan daftar transaksi milik anggota tersebut yang masih menunggu pembayaran beserta detail paket keanggotaan dan jumlah yang harus dibayar.
+      </p>
+      <p class="indent text-gray-700 mb-4">
+        Kasir memilih transaksi yang akan dibayar, memasukkan jumlah uang yang diterima dari anggota, dan memilih metode pembayaran (tunai atau transfer bank). Sistem secara otomatis menghitung jumlah kembalian apabila uang yang diterima melebihi jumlah tagihan. Kasir kemudian mengkonfirmasi pembayaran dengan mengirimkan formulir ke <code class="bg-gray-100 px-1 rounded text-sm">POST /cashier/pay/{transaction}</code>.
+      </p>
+      <p class="indent text-gray-700 mb-4">
+        Setelah pembayaran dikonfirmasi, sistem mencatat transaksi sebagai lunas, memperbarui status keanggotaan anggota menjadi aktif, menetapkan tanggal mulai dan tanggal berakhir keanggotaan sesuai paket yang dipilih, dan mencatat seluruh aktivitas ini ke dalam log sistem. Kasir juga dapat memproses pembayaran untuk kunjungan non-anggota melalui menu <em>Bayar Non-Anggota</em> (<code class="bg-gray-100 px-1 rounded text-sm">POST /cashier/pay-non-member</code>).
+      </p>
+      <p class="indent text-gray-700">
+        Sistem diskon dapat diterapkan secara otomatis pada saat transaksi apabila anggota memenuhi syarat diskon yang telah dikonfigurasi sebelumnya oleh admin melalui menu Diskon (<code class="bg-gray-100 px-1 rounded text-sm">/discounts</code>). Diskon dapat berupa persentase dari total tagihan atau potongan nominal tertentu.
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- BAB 8 – POS SNACK                                           -->
+    <!-- ============================================================ -->
+    <div class="bg-white rounded-2xl shadow-md p-8 mb-8">
+      <h2 class="text-lg font-extrabold text-blue-800 border-b-2 border-blue-600 pb-2 mb-5">8. Alur Point of Sale (POS) Snack</h2>
+
+      <p class="indent text-gray-700 mb-4">
+        Fitur Point of Sale (<em>POS</em>) Snack dirancang untuk memproses penjualan produk makanan dan minuman yang tersedia di gym. Fitur ini dikelola oleh <em>PosController</em> dan dapat diakses melalui menu POS (<code class="bg-gray-100 px-1 rounded text-sm">/pos</code>).
+      </p>
+      <p class="indent text-gray-700 mb-4">
+        Kasir atau penjaga membuka halaman POS yang menampilkan katalog seluruh produk snack yang tersedia beserta stok dan harga masing-masing. Kasir memilih produk yang dibeli pelanggan dan menentukan jumlahnya. Setiap produk yang dipilih secara otomatis ditambahkan ke keranjang belanja virtual yang menampilkan ringkasan pesanan beserta total harga secara real-time.
+      </p>
+      <p class="indent text-gray-700 mb-4">
+        Setelah pemilihan produk selesai, kasir memproses pembayaran dengan mengirimkan pesanan ke <code class="bg-gray-100 px-1 rounded text-sm">POST /pos/checkout</code>. Sistem melalui <em>PosController@checkout</em> akan membuat catatan transaksi snack baru (<em>SnackTransaction</em>), mencatat detail setiap item yang dibeli (<em>SnackTransactionDetail</em>), dan mengurangi stok produk yang terjual dari inventori secara otomatis. Apabila stok suatu produk tidak mencukupi, sistem akan memberikan peringatan sebelum transaksi diproses.
+      </p>
+      <p class="indent text-gray-700">
+        Manajemen inventori snack dilakukan secara terpisah melalui menu Snack (<code class="bg-gray-100 px-1 rounded text-sm">/snacks</code>). Staf dapat menambahkan stok masuk melalui <code class="bg-gray-100 px-1 rounded text-sm">POST /snacks/incoming</code> dan melakukan pengisian ulang kulkas display melalui <code class="bg-gray-100 px-1 rounded text-sm">POST /snacks/refill-kulkas</code>. Seluruh pergerakan stok dicatat secara otomatis dalam model <em>SnackRestock</em> untuk keperluan audit.
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- BAB 9 – LAPORAN                                             -->
+    <!-- ============================================================ -->
+    <div class="bg-white rounded-2xl shadow-md p-8 mb-8 page-break">
+      <h2 class="text-lg font-extrabold text-blue-800 border-b-2 border-blue-600 pb-2 mb-5">9. Alur Laporan Keuangan dan Shift</h2>
+
+      <h3 class="font-bold text-gray-800 mt-2 mb-2">9.1 Laporan Transaksi</h3>
+      <p class="indent text-gray-700 mb-4">
+        Seluruh transaksi yang terjadi dalam sistem dapat dipantau melalui menu Laporan Transaksi (<code class="bg-gray-100 px-1 rounded text-sm">/transactions</code>) yang dikelola oleh <em>TransactionController</em>. Halaman ini menampilkan daftar seluruh transaksi dengan fitur penyaringan berdasarkan rentang tanggal, jenis transaksi, dan status pembayaran. Pengguna dengan peran admin atau developer dapat mengekspor data transaksi ke dalam format Excel melalui <code class="bg-gray-100 px-1 rounded text-sm">GET /transactions/export</code>. Khusus pengguna dengan peran developer, tersedia pula fitur untuk mengedit atau menghapus transaksi apabila terjadi kesalahan pencatatan.
+      </p>
+
+      <h3 class="font-bold text-gray-800 mt-5 mb-2">9.2 Laporan Keuangan</h3>
+      <p class="indent text-gray-700 mb-4">
+        Laporan keuangan yang lebih komprehensif tersedia melalui menu Laporan Keuangan (<code class="bg-gray-100 px-1 rounded text-sm">/financial-report</code>) yang dikelola oleh <em>FinancialReportController</em>. Halaman ini menyajikan ringkasan pemasukan dari transaksi anggota dan penjualan snack, dikurangi dengan total pengeluaran operasional, sehingga menghasilkan gambaran laba atau rugi dalam periode tertentu. Pengeluaran operasional seperti biaya listrik, air, peralatan, dan lainnya dapat dicatat melalui menu Pengeluaran (<code class="bg-gray-100 px-1 rounded text-sm">/expenses</code>).
+      </p>
+
+      <h3 class="font-bold text-gray-800 mt-5 mb-2">9.3 Laporan Shift</h3>
+      <p class="indent text-gray-700">
+        Setiap kasir yang bertugas dapat membuka dan menutup shift kerjanya melalui menu Laporan Shift (<code class="bg-gray-100 px-1 rounded text-sm">/shift-reports</code>) yang dikelola oleh <em>ShiftReportController</em>. Pada saat menutup shift, kasir menyerahkan rekap transaksi yang terjadi selama shift tersebut berlangsung. Sistem menyimpan data rekonsiliasi shift ini dalam model <em>ShiftReconciliation</em> yang dapat diperiksa oleh supervisor atau admin untuk keperluan audit kas.
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- BAB 10 – KARYAWAN                                           -->
+    <!-- ============================================================ -->
+    <div class="bg-white rounded-2xl shadow-md p-8 mb-8">
+      <h2 class="text-lg font-extrabold text-blue-800 border-b-2 border-blue-600 pb-2 mb-5">10. Alur Manajemen Karyawan</h2>
+
+      <p class="indent text-gray-700 mb-4">
+        Fitur manajemen karyawan menyediakan sistem yang terintegrasi untuk mengelola data seluruh karyawan gym, termasuk jadwal kerja, pencatatan kehadiran, dan penggajian. Fitur ini hanya dapat diakses oleh pengguna dengan peran <em>admin</em> atau <em>developer</em>.
+      </p>
+
+      <h3 class="font-bold text-gray-800 mt-4 mb-2">10.1 Data Karyawan</h3>
+      <p class="indent text-gray-700 mb-4">
+        Admin dapat mengelola data karyawan melalui menu Karyawan (<code class="bg-gray-100 px-1 rounded text-sm">/employees</code>) yang dikelola oleh <em>EmployeeController</em>. Fitur CRUD (<em>Create, Read, Update, Delete</em>) tersedia untuk menambah karyawan baru, melihat dan mengubah data karyawan, serta menonaktifkan karyawan yang sudah tidak bekerja.
+      </p>
+
+      <h3 class="font-bold text-gray-800 mt-4 mb-2">10.2 Jadwal Shift Karyawan</h3>
+      <p class="indent text-gray-700 mb-4">
+        Jadwal kerja setiap karyawan dikelola melalui <em>EmployeeShiftController</em>. Admin dapat menetapkan jadwal shift kerja untuk setiap karyawan melalui halaman <code class="bg-gray-100 px-1 rounded text-sm">/employees/{id}/shifts</code>. Jadwal ini mencatat hari kerja, jam masuk, dan jam pulang yang diharapkan untuk setiap karyawan.
+      </p>
+
+      <h3 class="font-bold text-gray-800 mt-4 mb-2">10.3 Absensi Karyawan</h3>
+      <p class="indent text-gray-700 mb-4">
+        Kehadiran karyawan dicatat secara manual oleh admin melalui menu Absensi Karyawan (<code class="bg-gray-100 px-1 rounded text-sm">/employee-attendances</code>) yang dikelola oleh <em>EmployeeAttendanceController</em>. Admin memasukkan data kehadiran setiap karyawan termasuk jam masuk, jam keluar, dan keterangan apabila ada ketidakhadiran.
+      </p>
+
+      <h3 class="font-bold text-gray-800 mt-4 mb-2">10.4 Penggajian</h3>
+      <p class="indent text-gray-700 mb-4">
+        Sistem penggajian dikelola melalui <em>EmployeePayrollController</em>. Admin dapat membuat catatan penggajian untuk setiap karyawan berdasarkan periode tertentu melalui <code class="bg-gray-100 px-1 rounded text-sm">/employees/{id}/payrolls</code>. Catatan ini mencakup jumlah gaji pokok, tunjangan, potongan, dan jumlah bersih yang dibayarkan.
+      </p>
+
+      <h3 class="font-bold text-gray-800 mt-4 mb-2">10.5 Informasi Pribadi Karyawan</h3>
+      <p class="indent text-gray-700">
+        Setiap karyawan yang memiliki akun di sistem dapat melihat informasi pekerjaan mereka sendiri melalui menu Informasi Saya (<code class="bg-gray-100 px-1 rounded text-sm">/my-employee-info</code>). Halaman ini menampilkan jadwal shift aktif, riwayat absensi, dan riwayat penggajian milik karyawan yang sedang login.
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- BAB 11 – STREAMING                                          -->
+    <!-- ============================================================ -->
+    <div class="bg-white rounded-2xl shadow-md p-8 mb-8 page-break">
+      <h2 class="text-lg font-extrabold text-blue-800 border-b-2 border-blue-600 pb-2 mb-5">11. Alur Streaming Kamera dan Deteksi Wajah Real-time</h2>
+
+      <p class="indent text-gray-700 mb-4">
+        Fitur streaming kamera memungkinkan pengguna untuk memantau area gym secara langsung melalui browser dengan kemampuan deteksi wajah real-time. Fitur ini dikelola oleh <em>StreamingCameraController</em> dan dapat diakses melalui menu Streaming Kamera (<code class="bg-gray-100 px-1 rounded text-sm">/streaming</code>) oleh seluruh pengguna yang telah masuk ke sistem.
+      </p>
+      <p class="indent text-gray-700 mb-4">
+        Ketika halaman streaming dibuka, browser meminta izin akses kamera kepada pengguna. Setelah izin diberikan, umpan video dari kamera ditampilkan secara langsung pada elemen video di halaman. Secara bersamaan, sistem mulai mengambil <em>frame</em> dari video secara periodik setiap 500 milidetik, mengonversinya ke format gambar Base64, dan mengirimkannya ke server melalui permintaan AJAX ke <code class="bg-gray-100 px-1 rounded text-sm">POST /streaming/analyze</code>.
+      </p>
+      <p class="indent text-gray-700 mb-4">
+        Server melalui <em>StreamingCameraController@analyze</em> meneruskan gambar ke API biometrik untuk diproses menggunakan model YuNet. API mengembalikan koordinat bounding box dari setiap wajah yang terdeteksi dalam gambar beserta informasi identitas apabila wajah tersebut cocok dengan data anggota yang terdaftar. Informasi ini dikirimkan kembali ke browser dalam format JSON.
+      </p>
+      <p class="indent text-gray-700">
+        Browser menerima respons JSON dan menggambar kotak pembatas (<em>bounding box</em>) di atas wajah yang terdeteksi menggunakan elemen <em>canvas</em> HTML yang dilapisi di atas video. Apabila wajah yang terdeteksi berhasil diidentifikasi sebagai anggota terdaftar, nama anggota tersebut ditampilkan di atas kotak pembatas. Algoritma IoU (<em>Intersection over Union</em>) digunakan untuk melacak konsistensi posisi wajah antar <em>frame</em> sehingga kotak pembatas tidak bergetar secara berlebihan.
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- BAB 12 – PERANGKAT                                          -->
+    <!-- ============================================================ -->
+    <div class="bg-white rounded-2xl shadow-md p-8 mb-8">
+      <h2 class="text-lg font-extrabold text-blue-800 border-b-2 border-blue-600 pb-2 mb-5">12. Alur Manajemen Perangkat Kiosk</h2>
+
+      <p class="indent text-gray-700 mb-4">
+        Fitur manajemen perangkat memungkinkan administrator untuk mendaftarkan dan mengelola perangkat kiosk fisik yang dipasang di lokasi gym untuk keperluan absensi mandiri anggota. Fitur ini dikelola oleh <em>DeviceController</em> dan dapat diakses melalui menu Perangkat (<code class="bg-gray-100 px-1 rounded text-sm">/devices</code>).
+      </p>
+      <p class="indent text-gray-700 mb-4">
+        Halaman ini menampilkan daftar seluruh perangkat kiosk yang telah terdaftar dalam sistem, lengkap dengan nama perangkat, status aktif atau nonaktif, dan informasi kredensial API yang digunakan oleh perangkat tersebut untuk berkomunikasi dengan layanan biometrik. Data perangkat diambil secara langsung dari API biometrik melalui <em>FaceRecognitionApi</em> dan disinkronkan saat halaman dimuat atau ketika pengguna menekan tombol refresh (<code class="bg-gray-100 px-1 rounded text-sm">GET /devices/refresh</code>).
+      </p>
+      <p class="indent text-gray-700 mb-4">
+        Administrator dapat mendaftarkan perangkat kiosk baru melalui formulir yang tersedia dengan mengisi nama perangkat dan informasi lokasinya, kemudian mengirimkan data ke <code class="bg-gray-100 px-1 rounded text-sm">POST /devices</code>. Sistem API biometrik akan menghasilkan pasangan kunci API (<em>API key</em>) yang unik untuk perangkat tersebut yang digunakan sebagai identitas perangkat saat berkomunikasi dengan server.
+      </p>
+      <p class="indent text-gray-700">
+        Perangkat yang sudah terdaftar dapat diaktifkan atau dinonaktifkan sewaktu-waktu melalui tombol <em>Toggle</em> yang mengirimkan permintaan ke <code class="bg-gray-100 px-1 rounded text-sm">PATCH /devices/{deviceId}/toggle</code>. Apabila kredensial API perangkat perlu diperbarui karena alasan keamanan, administrator dapat memutar ulang (<em>rotate</em>) kunci API melalui <code class="bg-gray-100 px-1 rounded text-sm">POST /devices/{deviceId}/rotate-credential</code> yang akan menghasilkan pasangan kunci baru dan membatalkan kunci lama secara otomatis.
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- BAB 13 – DATABASE                                           -->
+    <!-- ============================================================ -->
+    <div class="bg-white rounded-2xl shadow-md p-8 mb-8 page-break">
+      <h2 class="text-lg font-extrabold text-blue-800 border-b-2 border-blue-600 pb-2 mb-5">13. Struktur Database</h2>
+
+      <h3 class="font-bold text-gray-800 mt-2 mb-2">13.1 Database Bisnis (MySQL)</h3>
+      <p class="indent text-gray-700 mb-4">
+        Database MySQL menjadi pusat penyimpanan seluruh data bisnis operasional gym. Tabel-tabel utama dan fungsinya adalah sebagai berikut:
+      </p>
+      <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4 text-sm mb-6">
+        <li><strong>users</strong> — menyimpan data akun pengguna sistem beserta peran masing-masing (developer, admin, kasir, penjaga).</li>
+        <li><strong>members</strong> — menyimpan data anggota gym termasuk informasi pribadi, foto, dan status keanggotaan.</li>
+        <li><strong>gym_packages</strong> — menyimpan konfigurasi paket keanggotaan dengan durasi dan harga masing-masing.</li>
+        <li><strong>member_transactions</strong> — mencatat setiap transaksi keanggotaan beserta status pembayaran dan tanggal berlaku.</li>
+        <li><strong>member_attendances</strong> — menyimpan log kehadiran setiap anggota beserta metode absensi yang digunakan.</li>
+        <li><strong>discounts</strong> — menyimpan data diskon yang dapat diterapkan pada transaksi.</li>
+        <li><strong>employees</strong> — menyimpan data karyawan gym.</li>
+        <li><strong>employee_shifts</strong> — menyimpan jadwal shift kerja setiap karyawan.</li>
+        <li><strong>employee_attendances</strong> — mencatat kehadiran karyawan setiap hari.</li>
+        <li><strong>employee_payrolls</strong> — menyimpan catatan penggajian karyawan per periode.</li>
+        <li><strong>snacks</strong> — menyimpan daftar produk snack beserta harga dan stok saat ini.</li>
+        <li><strong>snack_transactions</strong> — mencatat setiap transaksi penjualan snack.</li>
+        <li><strong>snack_transaction_details</strong> — menyimpan detail item per transaksi snack.</li>
+        <li><strong>snack_restocks</strong> — mencatat setiap penambahan stok snack.</li>
+        <li><strong>expenses</strong> — menyimpan catatan pengeluaran operasional gym.</li>
+        <li><strong>shift_reconciliations</strong> — menyimpan data rekonsiliasi pada saat penutupan shift kasir.</li>
+        <li><strong>activity_logs</strong> — mencatat seluruh aktivitas signifikan yang dilakukan pengguna dalam sistem.</li>
+      </ul>
+
+      <h3 class="font-bold text-gray-800 mt-5 mb-2">13.2 Database Biometrik (SQLite — gym.db)</h3>
+      <p class="indent text-gray-700 mb-4">
+        Database SQLite digunakan secara terpisah khusus untuk menyimpan data biometrik yang sensitif. Pemisahan ini bertujuan untuk meningkatkan keamanan data wajah anggota agar tidak tercampur dengan data bisnis umum. Tabel-tabel utama dalam database ini meliputi:
+      </p>
+      <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4 text-sm">
+        <li><strong>users</strong> — akun internal API biometrik (superadmin, admin, reception) yang digunakan untuk autentikasi antara Laravel dan FastAPI.</li>
+        <li><strong>branches</strong> — data cabang gym yang terdaftar (kode cabang dan nama cabang).</li>
+        <li><strong>members</strong> — referensi ID anggota yang memiliki data biometrik terdaftar.</li>
+        <li><strong>face_enrollments</strong> — token sesi pendaftaran wajah yang sedang aktif.</li>
+        <li><strong>face_samples</strong> — vektor ciri wajah (<em>face embedding</em>) berukuran 128 dimensi hasil ekstraksi model SFace untuk setiap anggota.</li>
+        <li><strong>devices</strong> — daftar perangkat kiosk yang terdaftar beserta kunci API dan status aktivasinya.</li>
+      </ul>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- PENUTUP                                                     -->
+    <!-- ============================================================ -->
+    <div class="cover-bg text-white rounded-2xl shadow-lg p-8 mb-4 text-center">
+      <h2 class="text-lg font-bold mb-2">Penutup</h2>
+      <p class="text-blue-100 text-sm leading-relaxed max-w-2xl mx-auto">
+        Dokumen ini menjelaskan seluruh alur program Website BisaGym secara menyeluruh, mulai dari proses autentikasi hingga fitur-fitur canggih berbasis kecerdasan buatan. Sistem ini dirancang dengan mempertimbangkan kemudahan penggunaan bagi staf gym sekaligus keandalan teknologi AI biometrik untuk mendukung keamanan dan efisiensi operasional. Pengembangan lebih lanjut dapat dilakukan secara modular karena arsitektur sistem yang telah dipisahkan antara lapisan bisnis dan lapisan AI.
+      </p>
+      <div class="mt-4 text-xs text-blue-300">Website BisaGym · github.com/anugrah-1-dev/CitradanAI · November 2026</div>
+    </div>
+
+  </div><!-- end max-w -->
+</body>
+</html>

@@ -41,6 +41,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/attendance', [\App\Http\Controllers\AttendanceController::class, 'index'])->name('attendance.index');
     Route::post('/attendance', [\App\Http\Controllers\AttendanceController::class, 'store'])->name('attendance.store');
     Route::post('/attendance/face-checkin', [\App\Http\Controllers\AttendanceController::class, 'faceCheckin'])->name('attendance.face-checkin');
+    Route::post('/attendance/test-esp32', [\App\Http\Controllers\AttendanceController::class, 'testEsp32'])->name('attendance.test-esp32');
+    Route::get('/attendance/esp32-frame', [\App\Http\Controllers\AttendanceController::class, 'esp32Frame'])->name('attendance.esp32-frame');
+    Route::get('/attendance/esp32-stream', [\App\Http\Controllers\AttendanceController::class, 'esp32Stream'])->name('attendance.esp32-stream');
 
     Route::get('/face-enrollment', [\App\Http\Controllers\FaceEnrollmentController::class, 'index'])->name('face-enrollment.index');
     Route::post('/face-enrollment/{member}/start', [\App\Http\Controllers\FaceEnrollmentController::class, 'start'])->name('face-enrollment.start');

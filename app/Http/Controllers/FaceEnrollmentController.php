@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exceptions\FaceRecognitionApiException;
 use App\Models\Member;
 use App\Services\FaceRecognitionApi;
+use App\Traits\HandlesEsp32Cam;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -12,6 +13,7 @@ use Illuminate\Validation\ValidationException;
 
 class FaceEnrollmentController extends Controller
 {
+    use HandlesEsp32Cam;
     public function index(Request $request, FaceRecognitionApi $faceApi)
     {
         $search = trim((string) $request->query('search', ''));
@@ -110,8 +112,8 @@ class FaceEnrollmentController extends Controller
             $validated = $request->validate([
                 'session_id' => ['required', 'string', 'size:36'],
                 'pose_type' => ['required', 'in:FRONT,LEFT,RIGHT'],
+                'esp32_url' => ['nullable', 'string'],
             ]);
-            $image = $request->getContent();
 
             if ($member->face_enrollment_status !== 'IN_PROGRESS'
                 || $member->face_enrollment_session_id !== $validated['session_id']) {
@@ -120,7 +122,20 @@ class FaceEnrollmentController extends Controller
                 ], 409);
             }
 
-            if ($image === '' || strlen($image) > 5_000_000) {
+            $image = null;
+            if ($request->filled('esp32_url')) {
+                $image = $this->fetchEsp32Frame($request->input('esp32_url'));
+                if (! $image) {
+                    return response()->json([
+                        'message' => 'Gagal mengambil gambar dari ESP32-CAM. Pastikan modul menyala dan alamat IP benar.',
+                        'code' => 'CAMERA_CAPTURE_FAILED',
+                    ], 422);
+                }
+            } else {
+                $image = $request->getContent();
+            }
+
+            if ($image === '' || strlen($image) > 5_000_000 || strlen($image) < 100) {
                 return response()->json([
                     'message' => 'Gambar kosong atau melebihi batas ukuran 5 MB.',
                 ], 422);

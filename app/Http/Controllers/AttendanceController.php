@@ -12,9 +12,13 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use App\Traits\HandlesEsp32Cam;
+use Illuminate\Support\Facades\Http;
 
 class AttendanceController extends Controller
 {
+    use HandlesEsp32Cam;
+
     public function index(Request $request, FaceRecognitionApi $faceApi)
     {
         $selectedDate = $request->query('date', Carbon::today()->format('Y-m-d'));
@@ -155,6 +159,16 @@ class AttendanceController extends Controller
                 $imageBytes = file_get_contents($request->file('frame')->getRealPath());
             } elseif ($request->filled('image')) {
                 $imageBytes = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', (string) $request->input('image')));
+            } elseif ($request->filled('esp32_url')) {
+                $imageBytes = $this->fetchEsp32Frame($request->input('esp32_url'));
+                if (! $imageBytes) {
+                    return response()->json([
+                        'decision' => 'DENY',
+                        'code' => 'ESP32_UNREACHABLE',
+                        'title' => 'Kamera ESP32-CAM Tidak Merespons',
+                        'message' => 'Gagal mengambil gambar dari ESP32-CAM. Pastikan perangkat aktif, terhubung ke Wi-Fi, dan alamat IP benar.',
+                    ], 422);
+                }
             } elseif ($request->getContent() !== '' && ! in_array($request->getContent(), ['{}', '[]'], true)) {
                 $imageBytes = $request->getContent();
             }
@@ -314,5 +328,98 @@ class AttendanceController extends Controller
                 'message' => $e->getMessage(),
             ], min(max($e->status, 400), 599));
         }
+    }
+
+    public function testEsp32(Request $request): JsonResponse
+    {
+        $request->validate([
+            'esp32_url' => 'required|string',
+        ]);
+
+        $bytes = $this->fetchEsp32Frame($request->input('esp32_url'));
+        if ($bytes && strlen($bytes) > 500) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Koneksi ke ESP32-CAM berhasil! Frame gambar valid ('.round(strlen($bytes) / 1024, 1).' KB).',
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Tidak dapat mengambil frame dari ESP32-CAM. Pastikan modul menyala, berada di jaringan Wi-Fi yang sama, dan alamat IP/URL benar.',
+        ], 422);
+    }
+
+    public function esp32Frame(Request $request)
+    {
+        $url = $request->query('url');
+        if (! $url) {
+            return response('Parameter url diperlukan', 400);
+        }
+
+        $bytes = $this->fetchEsp32Frame($url);
+        if (! $bytes) {
+            return response('Gagal mengambil frame dari ESP32-CAM', 502);
+        }
+
+        return response($bytes, 200, [
+            'Content-Type' => 'image/jpeg',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
+        ]);
+    }
+
+    /**
+     * Proxy MJPEG stream dari ESP32-CAM melalui Laravel
+     * untuk mengatasi masalah CORS / jaringan berbeda.
+     */
+    public function esp32Stream(Request $request)
+    {
+        $url = $request->query('url');
+        if (! $url) {
+            return response('Parameter url diperlukan', 400);
+        }
+
+        $streamUrl = $this->normalizeEsp32Url($url);
+        $parsed = parse_url($streamUrl);
+        $host = $parsed['host'] ?? '127.0.0.1';
+
+        // Tentukan URL stream: biasanya port 81
+        if (str_contains($streamUrl, '/stream')) {
+            $target = $streamUrl;
+        } else {
+            $scheme = $parsed['scheme'] ?? 'http';
+            $target = "{$scheme}://{$host}:81/stream";
+        }
+
+        // Gunakan Symfony StreamedResponse untuk proxy stream
+        return response()->stream(function () use ($target) {
+            $ch = curl_init($target);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => false,
+                CURLOPT_TIMEOUT => 0,           // tanpa batas waktu
+                CURLOPT_CONNECTTIMEOUT => 5,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_WRITEFUNCTION => function ($ch, $data) {
+                    echo $data;
+                    if (ob_get_level() > 0) ob_flush();
+                    flush();
+
+                    if (connection_aborted()) {
+                        return 0; // stop curl
+                    }
+
+                    return strlen($data);
+                },
+            ]);
+            curl_exec($ch);
+            curl_close($ch);
+        }, 200, [
+            'Content-Type' => 'multipart/x-mixed-replace;boundary=frame',
+            'Cache-Control' => 'no-cache, no-store',
+            'Access-Control-Allow-Origin' => '*',
+            'X-Accel-Buffering' => 'no',
+        ]);
     }
 }
