@@ -637,7 +637,10 @@
                     if (!ipOrUrl) return '';
                     let val = ipOrUrl.trim();
                     if (!/^https?:\/\//i.test(val)) {
-                        val = 'http://' + val;
+                        // Jika mengandung domain (huruf di hostname), default ke https
+                        // Jika IP numerik murni, default ke http
+                        const isIpAddress = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/.test(val.split('/')[0]);
+                        val = (isIpAddress ? 'http://' : 'https://') + val;
                     }
                     return val.replace(/\/+$/, '');
                 },
@@ -676,13 +679,7 @@
                     if (base.includes('/capture') || base.endsWith('.jpg')) {
                         return base;
                     }
-                    try {
-                        const u = new URL(base);
-                        const portStr = u.port && u.port !== '81' ? `:${u.port}` : '';
-                        return `${u.protocol}//${u.hostname}${portStr}/capture`;
-                    } catch (e) {
-                        return `${base}/capture`;
-                    }
+                    return `${base}/capture`;
                 },
 
                 updateEsp32Url() {
