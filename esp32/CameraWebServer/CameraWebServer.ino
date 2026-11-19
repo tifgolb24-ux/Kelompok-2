@@ -212,18 +212,20 @@ void startWebServer() {
     config.max_uri_handlers = 8;
     config.stack_size = 8192;
 
-    // Port 80: halaman utama, capture, size, status
+    // Port 80: halaman utama, capture, size, status, dan stream
     config.server_port = 80;
     if (httpd_start(&httpServer, &config) == ESP_OK) {
         httpd_uri_t indexUri   = { "/",        HTTP_GET, index_handler,   NULL };
         httpd_uri_t captureUri = { "/capture", HTTP_GET, capture_handler, NULL };
         httpd_uri_t sizeUri    = { "/size",    HTTP_GET, size_handler,    NULL };
         httpd_uri_t statusUri  = { "/status",  HTTP_GET, status_handler,  NULL };
+        httpd_uri_t streamUri80 = { "/stream", HTTP_GET, stream_handler,  NULL };
         httpd_register_uri_handler(httpServer, &indexUri);
         httpd_register_uri_handler(httpServer, &captureUri);
         httpd_register_uri_handler(httpServer, &sizeUri);
         httpd_register_uri_handler(httpServer, &statusUri);
-        Serial.println("[HTTP] Web server (port 80) aktif");
+        httpd_register_uri_handler(httpServer, &streamUri80);
+        Serial.println("[HTTP] Web server (port 80) aktif (lengkap dengan /stream & /capture)");
     }
 
     // Port 81: MJPEG stream
