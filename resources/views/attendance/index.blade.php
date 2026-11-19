@@ -617,6 +617,8 @@
                 esp32StreamSrc: '',
                 esp32Error: false,
                 esp32UseProxy: false,
+                esp32PollTimer: null,
+                esp32IsCloud: false,
 
                 init() {
                     // Clock for fullscreen
@@ -697,20 +699,66 @@
                 refreshEsp32Stream() {
                     if (!this.esp32Ip.trim()) return;
                     this.esp32UseProxy = false;
-                    const url = this.getEsp32StreamUrl();
-                    const sep = url.includes('?') ? '&' : '?';
-                    this.esp32StreamSrc = url + sep + '_t=' + Date.now();
                     this.esp32Error = false;
-                    this.esp32Status = 'Menghubungkan ke stream ESP32-CAM...';
+
+                    // Stop polling sebelumnya jika ada
+                    if (this.esp32PollTimer) {
+                        clearInterval(this.esp32PollTimer);
+                        this.esp32PollTimer = null;
+                    }
+
+                    const base = this.normalizeHost(this.esp32Ip);
+                    this.esp32IsCloud = /^https:/i.test(base);
+
+                    if (this.esp32IsCloud) {
+                        // CLOUD MODE: Polling /capture setiap 500ms (Railway tidak support MJPEG long-lived)
+                        this.esp32Status = 'Menghubungkan ke ESP32-CAM Cloud...';
+                        const captureUrl = this.getEsp32CaptureUrl();
+                        const self = this;
+                        let loadOk = false;
+
+                        function pollFrame() {
+                            const img = new Image();
+                            img.onload = function() {
+                                self.esp32StreamSrc = img.src;
+                                if (!loadOk) {
+                                    loadOk = true;
+                                    self.esp32Connected = true;
+                                    self.esp32Error = false;
+                                    self.esp32Status = 'ESP32-CAM Cloud aktif (polling mode).';
+                                }
+                            };
+                            img.onerror = function() {
+                                if (!loadOk) {
+                                    self.esp32Status = 'Menunggu frame dari ESP32-CAM...';
+                                }
+                            };
+                            img.src = captureUrl + (captureUrl.includes('?') ? '&' : '?') + '_t=' + Date.now();
+                        }
+
+                        pollFrame();
+                        this.esp32PollTimer = setInterval(pollFrame, 600);
+                    } else {
+                        // LOCAL MODE: MJPEG stream langsung (IP lokal / jaringan sama)
+                        const url = this.getEsp32StreamUrl();
+                        const sep = url.includes('?') ? '&' : '?';
+                        this.esp32StreamSrc = url + sep + '_t=' + Date.now();
+                        this.esp32Status = 'Menghubungkan ke stream ESP32-CAM lokal...';
+                    }
                 },
 
                 onEsp32ImageLoad() {
                     this.esp32Connected = true;
                     this.esp32Error = false;
-                    this.esp32Status = this.esp32UseProxy ? 'Stream ESP32-CAM aktif (via proxy).' : 'Stream ESP32-CAM aktif.';
+                    if (!this.esp32IsCloud) {
+                        this.esp32Status = this.esp32UseProxy ? 'Stream ESP32-CAM aktif (via proxy).' : 'Stream ESP32-CAM aktif.';
+                    }
                 },
 
                 onEsp32ImageError() {
+                    // Cloud mode pakai polling, jangan fallback ke proxy
+                    if (this.esp32IsCloud) return;
+
                     // Jika belum coba proxy, coba lewat proxy Laravel
                     if (!this.esp32UseProxy && this.esp32Ip.trim()) {
                         this.esp32UseProxy = true;
@@ -762,6 +810,11 @@
                 setCameraSource(source) {
                     this.cameraSource = source;
                     localStorage.setItem('bisagym_camera_source', source);
+                    // Hentikan polling jika pindah dari ESP32
+                    if (source === 'webcam' && this.esp32PollTimer) {
+                        clearInterval(this.esp32PollTimer);
+                        this.esp32PollTimer = null;
+                    }
                     if (this.activeMode === 'face') {
                         if (source === 'webcam') {
                             this.$nextTick(() => this.startCamera(this.isFullscreen ? 'fullscreenVideo' : 'kioskVideo'));
