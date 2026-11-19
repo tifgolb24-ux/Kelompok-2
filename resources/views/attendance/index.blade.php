@@ -650,12 +650,17 @@
                     }
                     try {
                         const u = new URL(base);
+                        // Jika menggunakan HTTPS tunnel (ngrok, cloudflare, localtunnel) atau domain, jangan tambahkan port :81
+                        if (u.protocol === 'https:' || /[a-z]/i.test(u.hostname.replace(/\./g, ''))) {
+                            return `${base}/stream`;
+                        }
+                        // Default ESP32-CAM IP lokal (port 81 untuk stream MJPEG standar)
                         if (!u.port || u.port === '80') {
                             return `${u.protocol}//${u.hostname}:81/stream`;
                         }
                         return `${base}/stream`;
                     } catch (e) {
-                        return `${base}:81/stream`;
+                        return `${base}/stream`;
                     }
                 },
 

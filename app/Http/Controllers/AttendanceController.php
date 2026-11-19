@@ -385,12 +385,16 @@ class AttendanceController extends Controller
         $parsed = parse_url($streamUrl);
         $host = $parsed['host'] ?? '127.0.0.1';
 
-        // Tentukan URL stream: biasanya port 81
+        // Tentukan URL stream: port 81 untuk IP lokal lama, atau /stream langsung untuk tunnel HTTPS/domain
         if (str_contains($streamUrl, '/stream')) {
             $target = $streamUrl;
         } else {
             $scheme = $parsed['scheme'] ?? 'http';
-            $target = "{$scheme}://{$host}:81/stream";
+            if ($scheme === 'https' || preg_match('/[a-z]/i', str_replace('.', '', $host))) {
+                $target = "{$streamUrl}/stream";
+            } else {
+                $target = "{$scheme}://{$host}:81/stream";
+            }
         }
 
         // Gunakan Symfony StreamedResponse untuk proxy stream
@@ -401,6 +405,11 @@ class AttendanceController extends Controller
                 CURLOPT_TIMEOUT => 0,           // tanpa batas waktu
                 CURLOPT_CONNECTTIMEOUT => 5,
                 CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_HTTPHEADER => [
+                    'ngrok-skip-browser-warning: 1',
+                    'bypass-tunnel-reminder: 1',
+                    'User-Agent: BisaGym-ESP32-Client/1.0',
+                ],
                 CURLOPT_WRITEFUNCTION => function ($ch, $data) {
                     echo $data;
                     if (ob_get_level() > 0) ob_flush();
