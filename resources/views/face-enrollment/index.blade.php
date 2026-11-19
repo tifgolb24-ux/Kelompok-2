@@ -330,6 +330,8 @@
     let esp32Connected = false;
     let esp32UseProxy = false;
     let esp32Testing = false;
+    let esp32PollTimer = null;
+    let esp32IsCloud = false;
 
     if (esp32IpInput) {
         esp32IpInput.value = esp32Ip;
@@ -407,26 +409,75 @@
 
     function startEsp32Stream() {
         if (!esp32Img) return;
+
+        if (esp32PollTimer) {
+            clearInterval(esp32PollTimer);
+            esp32PollTimer = null;
+        }
+
         if (!esp32Ip.trim()) {
             esp32Connected = false;
             esp32Img.classList.add('hidden');
             esp32Placeholder?.classList.remove('hidden');
             esp32Placeholder?.classList.add('flex');
-            if (esp32PlaceholderHint) esp32PlaceholderHint.textContent = 'Masukkan IP ESP32-CAM pada kotak di atas.';
+            if (esp32PlaceholderHint) esp32PlaceholderHint.textContent = 'Masukkan IP/URL ESP32-CAM pada kotak di atas.';
             if (esp32StatusBadge) {
                 esp32StatusBadge.className = 'text-[10px] font-mono px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700';
                 esp32StatusBadge.textContent = 'IP Belum Diisi';
             }
-            if (esp32StatusText) esp32StatusText.textContent = 'Masukkan alamat IP ESP32-CAM';
+            if (esp32StatusText) esp32StatusText.textContent = 'Masukkan alamat IP/URL ESP32-CAM';
             return;
         }
+
+        const base = normalizeHost(esp32Ip);
+        esp32IsCloud = /^https:/i.test(base);
 
         if (esp32StatusBadge) {
             esp32StatusBadge.className = 'text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30';
             esp32StatusBadge.textContent = 'Menghubungkan...';
         }
-        if (esp32StatusText) esp32StatusText.textContent = 'Menghubungkan ke stream ESP32-CAM...';
+        if (esp32StatusText) esp32StatusText.textContent = 'Menghubungkan ke ESP32-CAM...';
 
+        if (esp32IsCloud) {
+            // CLOUD MODE: Polling /capture setiap 600ms (Railway / HTTPS tunnel)
+            const captureUrl = getEsp32CaptureUrl();
+            let loadOk = false;
+
+            function pollFrame() {
+                const img = new Image();
+                img.onload = () => {
+                    esp32Img.src = img.src;
+                    esp32Img.classList.remove('hidden');
+                    esp32Placeholder?.classList.add('hidden');
+                    esp32Placeholder?.classList.remove('flex');
+                    if (!loadOk) {
+                        loadOk = true;
+                        esp32Connected = true;
+                        if (esp32StatusBadge) {
+                            esp32StatusBadge.className = 'text-[10px] font-mono px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 border border-green-500/30';
+                            esp32StatusBadge.textContent = 'Cloud Aktif';
+                        }
+                        if (esp32StatusText) esp32StatusText.textContent = 'ESP32-CAM Cloud aktif.';
+                    }
+                };
+                img.onerror = () => {
+                    if (!loadOk) {
+                        if (esp32StatusBadge) {
+                            esp32StatusBadge.className = 'text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30';
+                            esp32StatusBadge.textContent = 'Menunggu';
+                        }
+                        if (esp32StatusText) esp32StatusText.textContent = 'Menunggu frame dari ESP32-CAM...';
+                    }
+                };
+                img.src = captureUrl + (captureUrl.includes('?') ? '&' : '?') + '_t=' + Date.now();
+            }
+
+            pollFrame();
+            esp32PollTimer = setInterval(pollFrame, 600);
+            return;
+        }
+
+        // LOCAL MODE: MJPEG stream port 81 / local IP
         const url = esp32UseProxy ? getEsp32ProxyStreamUrl() : getEsp32StreamUrl();
         const sep = url.includes('?') ? '&' : '?';
 
@@ -468,6 +519,11 @@
         cameraSource = source;
         localStorage.setItem('bisagym_camera_source', source);
         updateCameraSourceUI();
+
+        if (source === 'webcam' && esp32PollTimer) {
+            clearInterval(esp32PollTimer);
+            esp32PollTimer = null;
+        }
 
         if (capturePanel.classList.contains('hidden')) return;
 
@@ -601,6 +657,10 @@
 
     function stopAllCameras() {
         stopCamera();
+        if (esp32PollTimer) {
+            clearInterval(esp32PollTimer);
+            esp32PollTimer = null;
+        }
         if (esp32Img) {
             esp32Img.src = '';
             esp32Img.classList.add('hidden');

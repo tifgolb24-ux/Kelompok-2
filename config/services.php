@@ -37,8 +37,8 @@ return [
 
     'bisagym_face' => [
         'url' => env('BISAGYM_FACE_API_URL', 'http://127.0.0.1:8001'),
-        'email' => env('BISAGYM_FACE_API_EMAIL'),
-        'password' => env('BISAGYM_FACE_API_PASSWORD'),
+        'email' => env('BISAGYM_FACE_API_EMAIL', 'superadmin@gym.local'),
+        'password' => env('BISAGYM_FACE_API_PASSWORD', 'GymDemo123!'),
         'branch_code' => env('BISAGYM_FACE_API_BRANCH_CODE', 'GYM-001'),
     ],
 
