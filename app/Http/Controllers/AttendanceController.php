@@ -336,18 +336,25 @@ class AttendanceController extends Controller
             'esp32_url' => 'required|string',
         ]);
 
-        $bytes = $this->fetchEsp32Frame($request->input('esp32_url'));
-        if ($bytes && strlen($bytes) > 500) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Koneksi ke ESP32-CAM berhasil! Frame gambar valid ('.round(strlen($bytes) / 1024, 1).' KB).',
-            ]);
-        }
+        try {
+            $bytes = $this->fetchEsp32Frame($request->input('esp32_url'));
+            if ($bytes && strlen($bytes) > 500) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Koneksi ke ESP32-CAM berhasil! Frame gambar valid ('.round(strlen($bytes) / 1024, 1).' KB).',
+                ]);
+            }
 
-        return response()->json([
-            'success' => false,
-            'message' => 'Tidak dapat mengambil frame dari ESP32-CAM. Pastikan modul menyala, berada di jaringan Wi-Fi yang sama, dan alamat IP/URL benar.',
-        ], 422);
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak dapat mengambil frame dari ESP32-CAM. Pastikan modul menyala dan alamat URL benar.',
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error saat menghubungi ESP32-CAM: '.$e->getMessage(),
+            ], 422);
+        }
     }
 
     public function esp32Frame(Request $request)
