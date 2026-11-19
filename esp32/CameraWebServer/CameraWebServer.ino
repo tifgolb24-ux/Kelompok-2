@@ -19,6 +19,8 @@
 #include <Arduino.h>
 #include "esp_camera.h"
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <HTTPClient.h>
 #include <ESPmDNS.h>
 #include "esp_http_server.h"
 
@@ -27,6 +29,14 @@
 // ===========================
 const char *ssid     = "REDMI Note 15 5G";
 const char *password = "mimpiIBADAH";
+
+// ===========================
+// Cloud Relay (Railway)
+// ===========================
+const char *railwayUploadUrl = "https://esp32cam-production-704ea82e.up.railway.app/upload";
+const int uploadIntervalMs   = 200;
+TaskHandle_t uploadTaskHandle = NULL;
+bool cloudUploadActive       = true;
 
 // ===========================
 // Pin kamera AI-Thinker ESP32-CAM
@@ -267,6 +277,64 @@ bool connectWiFi() {
     return false;
 }
 
+// ---------------------------------------------------------------------
+// Background Task: Unggah frame JPEG otomatis ke Railway Cloud
+// ---------------------------------------------------------------------
+void railwayUploadLoop(void *param) {
+    Serial.println("[Cloud] Upload task aktif di Core 1");
+
+    WiFiClientSecure secureClient;
+    secureClient.setInsecure(); // Bypass cert check untuk efisiensi kecepatan
+
+    HTTPClient https;
+    unsigned long lastLog = 0;
+    int successCount = 0;
+    int failCount = 0;
+
+    while (true) {
+        if (!cloudUploadActive || !railwayUploadUrl || strlen(railwayUploadUrl) < 10) {
+            vTaskDelay(2000 / portTICK_PERIOD_MS);
+            continue;
+        }
+
+        if (WiFi.status() == WL_CONNECTED) {
+            camera_fb_t *fb = esp_camera_fb_get();
+            if (fb) {
+                if (https.begin(secureClient, railwayUploadUrl)) {
+                    https.addHeader("Content-Type", "image/jpeg");
+                    https.setTimeout(3500);
+
+                    int code = https.POST(fb->buf, fb->len);
+                    if (code == 200) {
+                        successCount++;
+                    } else {
+                        failCount++;
+                        if (failCount % 10 == 0) {
+                            Serial.printf("[Cloud] Upload HTTP %d\n", code);
+                        }
+                    }
+                    https.end();
+                } else {
+                    failCount++;
+                }
+                esp_camera_fb_return(fb);
+            }
+
+            if (millis() - lastLog >= 10000) {
+                lastLog = millis();
+                if (successCount > 0 || failCount > 0) {
+                    Serial.printf("[Cloud] 10s: %d OK, %d Gagal | Free Heap: %u\n",
+                                  successCount, failCount, ESP.getFreeHeap());
+                }
+                successCount = 0;
+                failCount = 0;
+            }
+        }
+
+        vTaskDelay(uploadIntervalMs / portTICK_PERIOD_MS);
+    }
+}
+
 // ---------------------------
 // Inisialisasi Kamera (logika CameraWebServer)
 // ---------------------------
@@ -349,13 +417,27 @@ void setup() {
             Serial.println("[mDNS] http://esp32cam.local");
         }
         startWebServer();
+
+        // Mulai background upload ke Railway di Core 1
+        xTaskCreatePinnedToCore(
+            railwayUploadLoop,
+            "railwayUpload",
+            8192,
+            NULL,
+            1,
+            &uploadTaskHandle,
+            1
+        );
+
         Serial.println("=================================================");
         Serial.printf("  Halaman : http://%s/\n",        WiFi.localIP().toString().c_str());
         Serial.printf("  Stream  : http://%s:81/stream\n", WiFi.localIP().toString().c_str());
         Serial.printf("  Capture : http://%s/capture\n",  WiFi.localIP().toString().c_str());
         Serial.printf("  Status  : http://%s/status\n",   WiFi.localIP().toString().c_str());
+        Serial.printf("  Cloud   : %s\n",                 railwayUploadUrl);
         Serial.println("=================================================");
-        Serial.println("Masukkan IP di atas ke halaman Absensi BisaGym.");
+        Serial.println("Kamera online di: https://esp32cam-production-704ea82e.up.railway.app");
+        Serial.println("Masukkan URL Cloud di atas ke halaman Absensi BisaGym.");
     } else {
         Serial.printf("[ERROR] WiFi: %s | Kamera: %s\n",
                       wifiOk ? "OK" : "GAGAL", camOk ? "OK" : "GAGAL");
