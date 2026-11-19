@@ -18,7 +18,7 @@
                         @if($apiReady)
                             Sampel diproses oleh service biometrik lokal (bisagym-api). Foto mentah tidak disimpan oleh Laravel.
                         @else
-                            Jalankan service biometrik lokal (bisagym-api), lalu isi BISAGYM_FACE_API_EMAIL dan BISAGYM_FACE_API_PASSWORD pada .env Laravel.
+                            Pastikan BISAGYM_FACE_API_URL mengarah ke service biometrik yang dapat dijangkau Laravel (lokal atau Railway), kredensial API terisi, dan model YuNet/SFace siap.
                         @endif
                     </p>
                 </div>
@@ -338,8 +338,20 @@
     function normalizeHost(val) {
         if (!val) return '';
         val = val.trim();
-        if (!/^https?:\/\//i.test(val)) val = 'http://' + val;
-        return val.replace(/\/+$/, '');
+        if (!/^https?:\/\//i.test(val)) {
+            const isIpAddress = /^\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?$/.test(val.split('/')[0]);
+            val = (isIpAddress ? 'http://' : 'https://') + val;
+        }
+
+        try {
+            const url = new URL(val);
+            if (url.pathname.replace(/\/+$/, '').toLowerCase() === '/upload') {
+                url.pathname = '';
+            }
+            return url.toString().replace(/\/+$/, '');
+        } catch (e) {
+            return val.replace(/\/+$/, '');
+        }
     }
 
     function getEsp32StreamUrl() {
@@ -348,10 +360,13 @@
         if (base.includes('/stream') || base.includes('.mjpg')) return base;
         try {
             const u = new URL(base);
+            if (u.protocol === 'https:' || /[a-z]/i.test(u.hostname.replace(/\./g, ''))) {
+                return `${base}/stream`;
+            }
             if (!u.port || u.port === '80') return `${u.protocol}//${u.hostname}:81/stream`;
             return `${base}/stream`;
         } catch (e) {
-            return `${base}:81/stream`;
+            return `${base}/stream`;
         }
     }
 
@@ -363,15 +378,18 @@
 
     function getEsp32CaptureUrl() {
         if (!esp32Ip.trim()) return '';
-        const base = normalizeHost(esp32Ip);
+        let base = normalizeHost(esp32Ip);
         if (base.includes('/capture') || base.endsWith('.jpg')) return base;
         try {
             const u = new URL(base);
+            if (u.pathname.replace(/\/+$/, '').toLowerCase().endsWith('/stream')) {
+                u.pathname = u.pathname.replace(/\/stream\/?$/i, '');
+            }
             const portStr = u.port && u.port !== '81' ? `:${u.port}` : '';
-            return `${u.protocol}//${u.hostname}${portStr}/capture`;
+            base = `${u.protocol}//${u.hostname}${portStr}${u.pathname.replace(/\/+$/, '')}`;
         } catch (e) {
-            return `${base}/capture`;
         }
+        return `${base}/capture`;
     }
 
     function updateCameraSourceUI() {
