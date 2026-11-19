@@ -25,9 +25,8 @@
 const char *ssid     = "REDMI Note 15 5G";
 const char *password = "mimpiIBADAH";
 
-// Ganti domain ini dengan domain Railway setelah kamu deploy repo ini ke Railway:
-// Contoh: "https://esp32cam-production-xxxx.up.railway.app/upload"
-const char *railwayUploadUrl = "https://GANTI-DENGAN-DOMAIN-RAILWAY-KAMU.up.railway.app/upload";
+// Domain Railway aktif:
+const char *railwayUploadUrl = "https://esp32cam-production-704ea82e.up.railway.app/upload";
 
 // Delay antar upload ke cloud (milidetik). 150-300ms menghasilkan 3-6 FPS yang halus & hemat kuota
 const int uploadIntervalMs = 200;
