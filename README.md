@@ -15,3 +15,14 @@ Sistem Manajemen Gym **BisaGym** terintegrasi Pengolahan Citra Digital dan AI Bi
    - Terminal 1: `php artisan face-api:serve`
    - Terminal 2: `php artisan serve --port=8000`
 
+## Konfigurasi local dan production
+
+- `.env.example` adalah template **local development**. Jangan salin nilainya sebagai konfigurasi production.
+- Website Laravel di Hostinger memakai database MySQL Hostinger melalui `DB_CONNECTION`, `DB_HOST`,
+  `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, dan `DB_PASSWORD`.
+- API biometrik di Railway memakai database MySQL Railway melalui `DATABASE_URL`. Jangan gunakan
+  `DATABASE_URL` API sebagai konfigurasi database Laravel.
+- Pada environment Laravel Hostinger, `BISAGYM_FACE_API_URL` harus berisi URL HTTPS publik API Railway,
+  sedangkan `BISAGYM_FACE_API_EMAIL` dan `BISAGYM_FACE_API_PASSWORD` adalah akun layanan API.
+- Simpan nilai production di environment settings masing-masing provider, bukan di repository.
+

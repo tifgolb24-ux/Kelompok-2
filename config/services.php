@@ -36,9 +36,9 @@ return [
     ],
 
     'bisagym_face' => [
-        'url' => env('BISAGYM_FACE_API_URL', 'https://api-production-0a7bd81c.up.railway.app'),
-        'email' => env('BISAGYM_FACE_API_EMAIL', 'superadmin@gym.local'),
-        'password' => env('BISAGYM_FACE_API_PASSWORD', 'GymDemo123!'),
+        'url' => env('BISAGYM_FACE_API_URL'),
+        'email' => env('BISAGYM_FACE_API_EMAIL'),
+        'password' => env('BISAGYM_FACE_API_PASSWORD'),
         'branch_code' => env('BISAGYM_FACE_API_BRANCH_CODE', 'GYM-001'),
     ],
 

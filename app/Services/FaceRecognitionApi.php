@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Exceptions\FaceRecognitionApiException;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
@@ -17,6 +19,17 @@ class FaceRecognitionApi
 
         if ($url === '') {
             throw new FaceRecognitionApiException('URL API biometrik belum dikonfigurasi.');
+        }
+
+        if (app()->environment('production')) {
+            $scheme = parse_url($url, PHP_URL_SCHEME);
+            $host = parse_url($url, PHP_URL_HOST);
+            if ($scheme !== 'https' || ! is_string($host)
+                || in_array(strtolower($host), ['localhost', '127.0.0.1', '::1'], true)) {
+                throw new FaceRecognitionApiException(
+                    'Production harus menggunakan URL HTTPS API biometrik yang dapat dijangkau server.',
+                );
+            }
         }
 
         return rtrim($url, '/');
@@ -247,7 +260,7 @@ class FaceRecognitionApi
         if (is_string($encryptedToken)) {
             try {
                 $token = Crypt::decryptString($encryptedToken);
-            } catch (\Illuminate\Contracts\Encryption\DecryptException) {
+            } catch (DecryptException) {
                 Log::warning('Discarded unreadable biometric API token cache.');
                 Cache::forget($cacheKey);
             }
@@ -325,7 +338,7 @@ class FaceRecognitionApi
         string $token,
         array|string|null $body,
         ?string $contentType,
-    ): \Illuminate\Http\Client\Response {
+    ): Response {
         $request = Http::acceptJson()
             ->withToken($token)
             ->connectTimeout(3)
