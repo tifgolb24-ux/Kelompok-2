@@ -63,8 +63,8 @@ class FaceEnrollmentController extends Controller
                 );
             }
 
-            if (! $member->face_api_member_id) {
-                $externalId = $faceApi->findOrCreateMember([
+            $resolveMemberApiId = function () use ($member, $faceApi): string {
+                return $faceApi->findOrCreateMember([
                     'member_code' => $member->member_id,
                     'full_name' => $member->name,
                     'email' => $member->email,
@@ -76,15 +76,34 @@ class FaceEnrollmentController extends Controller
                     'address' => $member->address,
                     'status' => $member->status,
                 ]);
-                $member->face_api_member_id = $externalId;
+            };
+
+            if (! $member->face_api_member_id) {
+                $member->face_api_member_id = $resolveMemberApiId();
                 $member->save();
             }
 
-            $faceApi->createConsent(
-                $member->face_api_member_id,
-                'Website-BisaGym operator user ID: '.$request->user()->getAuthIdentifier(),
-            );
-            $session = $faceApi->startEnrollment($member->face_api_member_id);
+            try {
+                $faceApi->createConsent(
+                    $member->face_api_member_id,
+                    'Website-BisaGym operator user ID: '.$request->user()->getAuthIdentifier(),
+                );
+                $session = $faceApi->startEnrollment($member->face_api_member_id);
+            } catch (FaceRecognitionApiException $apiExc) {
+                // Jika member ID lama tidak ditemukan di database API baru (misal ganti service/database baru):
+                if ($apiExc->status === 404) {
+                    $member->face_api_member_id = $resolveMemberApiId();
+                    $member->save();
+
+                    $faceApi->createConsent(
+                        $member->face_api_member_id,
+                        'Website-BisaGym operator user ID: '.$request->user()->getAuthIdentifier(),
+                    );
+                    $session = $faceApi->startEnrollment($member->face_api_member_id);
+                } else {
+                    throw $apiExc;
+                }
+            }
 
             $member->face_enrollment_session_id = $session['id'];
             $member->face_enrollment_status = 'IN_PROGRESS';
@@ -197,17 +216,23 @@ class FaceEnrollmentController extends Controller
                 ], 409);
             }
 
-            $profile = $faceApi->faceProfileStatus($member->face_api_member_id);
-            if ($profile['enrolled'] ?? false) {
-                $faceApi->revokeFaceProfile(
+            try {
+                $profile = $faceApi->faceProfileStatus($member->face_api_member_id);
+                if ($profile['enrolled'] ?? false) {
+                    $faceApi->revokeFaceProfile(
+                        $member->face_api_member_id,
+                        'Persetujuan biometrik dicabut melalui Website-BisaGym.',
+                    );
+                }
+                $faceApi->revokeActiveConsents(
                     $member->face_api_member_id,
                     'Persetujuan biometrik dicabut melalui Website-BisaGym.',
                 );
+            } catch (FaceRecognitionApiException $e) {
+                if ($e->status !== 404) {
+                    throw $e;
+                }
             }
-            $faceApi->revokeActiveConsents(
-                $member->face_api_member_id,
-                'Persetujuan biometrik dicabut melalui Website-BisaGym.',
-            );
 
             $member->face_enrollment_status = 'REVOKED';
             $member->face_enrolled_at = null;
