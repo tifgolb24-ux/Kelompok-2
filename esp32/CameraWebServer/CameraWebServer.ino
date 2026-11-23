@@ -23,6 +23,7 @@
 #include <HTTPClient.h>
 #include <ESPmDNS.h>
 #include "esp_http_server.h"
+#include <Wire.h>
 
 // ===========================
 // WiFi (Hotspot HP 2.4 GHz)
@@ -58,8 +59,55 @@ bool cloudUploadActive       = true;
 #define HREF_GPIO_NUM     23
 #define PCLK_GPIO_NUM     22
 
-// LED Flash (GPIO 4 untuk AI-Thinker)
-#define LED_GPIO_NUM       4
+// =====================================================================
+// Konfigurasi Pin Periferal Tambahan
+// =====================================================================
+#define PIN_LED_1          14   // LED 1 (Hijau / Akses Diterima)
+#define PIN_LED_2           2   // LED 2 (Merah / Standby / Akses Ditolak)
+#define PIN_SUHU           16   // Sensor Suhu (Data pin Suhu)
+#define PIN_I2C_SCL        13   // I2C SCL (Display OLED / Sensor Suhu I2C)
+#define PIN_I2C_SDA        15   // I2C SDA
+#define PIN_RELAY           4   // Relay Kontrol Pintu / Solenoid (GPIO 4)
+
+// Level Aktif (Ubah ke LOW jika modul relay Anda tipe Active-LOW)
+#define RELAY_ACTIVE_LEVEL HIGH // HIGH = Relay Aktif (Buka Pintu)
+#define LED_ACTIVE_LEVEL   HIGH // HIGH = LED Menyala
+
+// Status Periferal
+bool relayState = false;
+bool led1State  = false;
+bool led2State  = false;
+
+// Timer non-blocking untuk auto-off relay (pulse mode)
+unsigned long relayTurnOffTime = 0;
+bool relayAutoOff = false;
+
+void setRelay(bool on) {
+    relayAutoOff = false;
+    relayState = on;
+    digitalWrite(PIN_RELAY, on ? RELAY_ACTIVE_LEVEL : !RELAY_ACTIVE_LEVEL);
+    Serial.printf("[HARDWARE] Relay: %s\n", on ? "AKTIF" : "NONAKTIF");
+}
+
+void triggerRelay(unsigned long durationMs = 3000) {
+    relayState = true;
+    digitalWrite(PIN_RELAY, RELAY_ACTIVE_LEVEL);
+    relayTurnOffTime = millis() + durationMs;
+    relayAutoOff = true;
+    Serial.printf("[HARDWARE] Relay AKTIF (Buka Pintu selama %lu ms)\n", durationMs);
+}
+
+void setLed1(bool on) {
+    led1State = on;
+    digitalWrite(PIN_LED_1, on ? LED_ACTIVE_LEVEL : !LED_ACTIVE_LEVEL);
+    Serial.printf("[HARDWARE] LED 1 (Pin %d): %s\n", PIN_LED_1, on ? "ON" : "OFF");
+}
+
+void setLed2(bool on) {
+    led2State = on;
+    digitalWrite(PIN_LED_2, on ? LED_ACTIVE_LEVEL : !LED_ACTIVE_LEVEL);
+    Serial.printf("[HARDWARE] LED 2 (Pin %d): %s\n", PIN_LED_2, on ? "ON" : "OFF");
+}
 
 httpd_handle_t httpServer   = NULL;  // port 80
 httpd_handle_t streamServer = NULL;  // port 81
@@ -70,8 +118,12 @@ httpd_handle_t streamServer = NULL;  // port 81
 static esp_err_t index_handler(httpd_req_t *req) {
     const char *html =
         "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'>"
-        "<title>BisaGym ESP32-CAM</title></head>"
-        "<body style='text-align:center;font-family:sans-serif;background:#111;color:#eee'>"
+        "<title>BisaGym ESP32-CAM</title>"
+        "<style>body{text-align:center;font-family:sans-serif;background:#111;color:#eee;padding:10px}"
+        "button{padding:8px 14px;margin:4px;border:none;border-radius:6px;cursor:pointer;font-weight:bold}"
+        ".btn-green{background:#10b981;color:#fff}.btn-blue{background:#3b82f6;color:#fff}"
+        ".btn-red{background:#ef4444;color:#fff}.btn-dark{background:#374151;color:#eee}</style></head>"
+        "<body>"
         "<h2>BisaGym ESP32-CAM</h2>"
         "<img id='cam' style='max-width:100%;border-radius:8px'>"
         "<p>Resolusi: "
@@ -80,8 +132,22 @@ static esp_err_t index_handler(httpd_req_t *req) {
         "<option value='8' selected>VGA 640x480</option>"
         "<option value='9'>SVGA 800x600</option>"
         "</select></p>"
-        "<p><a style='color:#6cf' href='/capture' target='_blank'>Ambil foto</a> | "
-        "<a style='color:#6cf' href='/status' target='_blank'>Status</a></p>"
+        "<hr style='border:1px solid #333;margin:15px 0'>"
+        "<h3>Kontrol Akses & Periferal</h3>"
+        "<p>"
+        "<button class='btn-green' onclick=\"fetch('/relay?action=open')\">Buka Pintu (Relay 3s)</button>"
+        "<button class='btn-dark' onclick=\"fetch('/relay?state=1')\">Relay ON</button>"
+        "<button class='btn-dark' onclick=\"fetch('/relay?state=0')\">Relay OFF</button>"
+        "</p>"
+        "<p>"
+        "<button class='btn-blue' onclick=\"fetch('/led?id=1&state=1')\">LED 1 ON (14)</button>"
+        "<button class='btn-dark' onclick=\"fetch('/led?id=1&state=0')\">LED 1 OFF</button>"
+        "<button class='btn-red' onclick=\"fetch('/led?id=2&state=1')\">LED 2 ON (2)</button>"
+        "<button class='btn-dark' onclick=\"fetch('/led?id=2&state=0')\">LED 2 OFF</button>"
+        "</p>"
+        "<p><a style='color:#6cf' href='/capture' target='_blank'>Ambil Foto</a> | "
+        "<a style='color:#6cf' href='/status' target='_blank'>Status JSON</a> | "
+        "<a style='color:#a3e635' href='/suhu' target='_blank'>Cek Suhu (16)</a></p>"
         "<script>"
         "var base='http://'+location.hostname+':81/stream';"
         "function startStream(){document.getElementById('cam').src=base+'?t='+Date.now();}"
@@ -153,20 +219,92 @@ static esp_err_t status_handler(httpd_req_t *req) {
     size_t frameBytes = frameOk ? testFb->len : 0;
     if (testFb) esp_camera_fb_return(testFb);
 
-    char json[256];
+    char json[384];
     snprintf(json, sizeof(json),
              "{\"status\":\"ready\",\"ip\":\"%s\","
              "\"psram\":%s,\"frame_ok\":%s,\"frame_bytes\":%u,"
-             "\"free_heap\":%u,\"stream_url\":\"http://%s:81/stream\","
+             "\"free_heap\":%u,"
+             "\"relay\":%s,\"led1\":%s,\"led2\":%s,\"suhu_pin\":%d,\"suhu_digital\":%d,"
+             "\"stream_url\":\"http://%s:81/stream\","
              "\"capture_url\":\"http://%s/capture\"}",
              WiFi.localIP().toString().c_str(),
              psramFound() ? "true" : "false",
              frameOk ? "true" : "false",
              (unsigned int)frameBytes,
              ESP.getFreeHeap(),
+             relayState ? "true" : "false",
+             led1State ? "true" : "false",
+             led2State ? "true" : "false",
+             PIN_SUHU,
+             digitalRead(PIN_SUHU),
              WiFi.localIP().toString().c_str(),
              WiFi.localIP().toString().c_str());
     return httpd_resp_send(req, json, strlen(json));
+}
+
+// ---------------------------
+// Handler Relay: /relay?action=open | /relay?state=1 | /relay?state=0
+// ---------------------------
+static esp_err_t relay_handler(httpd_req_t *req) {
+    char query[64], val[16];
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
+        if (httpd_query_key_value(query, "action", val, sizeof(val)) == ESP_OK) {
+            if (strcmp(val, "open") == 0 || strcmp(val, "pulse") == 0) {
+                unsigned long dur = 3000;
+                char durVal[16];
+                if (httpd_query_key_value(query, "duration", durVal, sizeof(durVal)) == ESP_OK) {
+                    dur = atoi(durVal);
+                    if (dur < 500) dur = 500;
+                    if (dur > 30000) dur = 30000;
+                }
+                triggerRelay(dur);
+            }
+        } else if (httpd_query_key_value(query, "state", val, sizeof(val)) == ESP_OK) {
+            int st = atoi(val);
+            setRelay(st == 1);
+        }
+    }
+    char resp[128];
+    snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"relay\":%s}", relayState ? "true" : "false");
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    return httpd_resp_send(req, resp, strlen(resp));
+}
+
+// ---------------------------
+// Handler LED: /led?id=1|2&state=1|0
+// ---------------------------
+static esp_err_t led_handler(httpd_req_t *req) {
+    char query[64], idVal[8], stateVal[8];
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
+        if (httpd_query_key_value(query, "id", idVal, sizeof(idVal)) == ESP_OK &&
+            httpd_query_key_value(query, "state", stateVal, sizeof(stateVal)) == ESP_OK) {
+            int id = atoi(idVal);
+            int st = atoi(stateVal);
+            if (id == 1) setLed1(st == 1);
+            else if (id == 2) setLed2(st == 1);
+        }
+    }
+    char resp[128];
+    snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"led1\":%s,\"led2\":%s}",
+             led1State ? "true" : "false", led2State ? "true" : "false");
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    return httpd_resp_send(req, resp, strlen(resp));
+}
+
+// ---------------------------
+// Handler Baca Suhu: /suhu
+// ---------------------------
+static esp_err_t suhu_handler(httpd_req_t *req) {
+    int rawValue = digitalRead(PIN_SUHU);
+    char resp[160];
+    snprintf(resp, sizeof(resp),
+             "{\"status\":\"ok\",\"pin\":%d,\"digital_raw\":%d,\"note\":\"Sensor suhu GPIO 16 siap diintegrasikan\"}",
+             PIN_SUHU, rawValue);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    return httpd_resp_send(req, resp, strlen(resp));
 }
 
 // ---------------------------
@@ -219,23 +357,30 @@ static esp_err_t stream_handler(httpd_req_t *req) {
 // ---------------------------
 void startWebServer() {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 8;
+    config.max_uri_handlers = 16;
     config.stack_size = 8192;
 
-    // Port 80: halaman utama, capture, size, status, dan stream
+    // Port 80: halaman utama, capture, size, status, stream, dan hardware kontrol
     config.server_port = 80;
     if (httpd_start(&httpServer, &config) == ESP_OK) {
-        httpd_uri_t indexUri   = { "/",        HTTP_GET, index_handler,   NULL };
-        httpd_uri_t captureUri = { "/capture", HTTP_GET, capture_handler, NULL };
-        httpd_uri_t sizeUri    = { "/size",    HTTP_GET, size_handler,    NULL };
-        httpd_uri_t statusUri  = { "/status",  HTTP_GET, status_handler,  NULL };
-        httpd_uri_t streamUri80 = { "/stream", HTTP_GET, stream_handler,  NULL };
+        httpd_uri_t indexUri    = { "/",        HTTP_GET, index_handler,   NULL };
+        httpd_uri_t captureUri  = { "/capture", HTTP_GET, capture_handler, NULL };
+        httpd_uri_t sizeUri     = { "/size",    HTTP_GET, size_handler,    NULL };
+        httpd_uri_t statusUri   = { "/status",  HTTP_GET, status_handler,  NULL };
+        httpd_uri_t streamUri80 = { "/stream",  HTTP_GET, stream_handler,  NULL };
+        httpd_uri_t relayUri    = { "/relay",   HTTP_GET, relay_handler,   NULL };
+        httpd_uri_t ledUri      = { "/led",     HTTP_GET, led_handler,     NULL };
+        httpd_uri_t suhuUri     = { "/suhu",    HTTP_GET, suhu_handler,    NULL };
+
         httpd_register_uri_handler(httpServer, &indexUri);
         httpd_register_uri_handler(httpServer, &captureUri);
         httpd_register_uri_handler(httpServer, &sizeUri);
         httpd_register_uri_handler(httpServer, &statusUri);
         httpd_register_uri_handler(httpServer, &streamUri80);
-        Serial.println("[HTTP] Web server (port 80) aktif (lengkap dengan /stream & /capture)");
+        httpd_register_uri_handler(httpServer, &relayUri);
+        httpd_register_uri_handler(httpServer, &ledUri);
+        httpd_register_uri_handler(httpServer, &suhuUri);
+        Serial.println("[HTTP] Web server (port 80) aktif (Kamera & Kontrol Hardware)");
     }
 
     // Port 81: MJPEG stream
@@ -405,9 +550,21 @@ void setup() {
     delay(1000);
     Serial.println("\n[BisaGym] ESP32-CAM CameraWebServer");
 
-    // LED flash off
-    pinMode(LED_GPIO_NUM, OUTPUT);
-    digitalWrite(LED_GPIO_NUM, LOW);
+    // Inisialisasi Pin Periferal Tambahan
+    pinMode(PIN_RELAY, OUTPUT);
+    digitalWrite(PIN_RELAY, !RELAY_ACTIVE_LEVEL); // Matikan relay saat startup
+
+    pinMode(PIN_LED_1, OUTPUT);
+    digitalWrite(PIN_LED_1, !LED_ACTIVE_LEVEL);   // Matikan LED 1
+
+    pinMode(PIN_LED_2, OUTPUT);
+    digitalWrite(PIN_LED_2, !LED_ACTIVE_LEVEL);   // Matikan LED 2
+
+    pinMode(PIN_SUHU, INPUT);                     // Inisialisasi Pin Suhu
+
+    // Inisialisasi Bus I2C (SCL Pin 13, SDA Pin 15)
+    Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+    Serial.printf("[I2C] Bus I2C aktif: SDA=%d, SCL=%d\n", PIN_I2C_SDA, PIN_I2C_SCL);
 
     bool camOk  = initCamera();
     bool wifiOk = connectWiFi();
@@ -448,20 +605,23 @@ void setup() {
 }
 
 // ── Loop ─────────────────────────────────────────────────────────────
+unsigned long lastWifiCheck = 0;
+
 void loop() {
-    if (WiFi.status() != WL_CONNECTED) {
-        Serial.println("[WiFi] Terputus, reconnect...");
-        WiFi.disconnect();
-        WiFi.begin(ssid, password);
-        int t = 0;
-        while (WiFi.status() != WL_CONNECTED && t < 20) {
-            delay(500);
-            Serial.print(".");
-            t++;
-        }
-        if (WiFi.status() == WL_CONNECTED) {
-            Serial.printf("\n[WiFi] Tersambung kembali: %s\n", WiFi.localIP().toString().c_str());
+    // 1. Cek timer auto-off relay (pulse mode 3 detik non-blocking)
+    if (relayAutoOff && millis() >= relayTurnOffTime) {
+        setRelay(false);
+    }
+
+    // 2. Cek koneksi WiFi setiap 10 detik secara non-blocking
+    if (millis() - lastWifiCheck >= 10000) {
+        lastWifiCheck = millis();
+        if (WiFi.status() != WL_CONNECTED) {
+            Serial.println("[WiFi] Terputus, mencoba reconnect...");
+            WiFi.disconnect();
+            WiFi.begin(ssid, password);
         }
     }
-    delay(10000);
+
+    delay(20); // Delay kecil agar CPU stabil dan tidak memicu watchdog
 }
