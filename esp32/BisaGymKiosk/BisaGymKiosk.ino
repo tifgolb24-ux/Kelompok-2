@@ -36,10 +36,22 @@
 #include <Arduino.h>
 #include "esp_camera.h"
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <HTTPClient.h>
 #include <ESPmDNS.h>
 #include "esp_http_server.h"
 #include <Wire.h>
 #include <Preferences.h>
+
+// =====================================================================
+//  PENGATURAN CLOUD RAILWAY & WEBSITE (fitfacely.com)
+// =====================================================================
+const char* railwayUploadUrl = "https://esp32cam-production-704ea82e.up.railway.app/upload";
+const char* feedbackUrl      = "https://fitfacely.com/api/kiosk-feedback";
+const int   uploadIntervalMs = 400;   // Upload frame ke Railway tiap 400ms (stabil)
+const int   feedbackPollMs   = 1200;  // Cek sinyal Buzzer/LED dari website tiap 1.2 detik
+TaskHandle_t cloudTaskHandle = NULL;
+String lastFeedbackId        = "";
 
 // =====================================================================
 //  PENGATURAN WI-FI (Daftar Multi-SSID — Otomatis Pilih Yang Tersedia)
@@ -506,7 +518,7 @@ static esp_err_t stream_handler(httpd_req_t* req) {
         }
         gagal = 0;
 
-        res = httpd_resp_send_chunk(req, "\r\n--frame\r\n", 12);
+        res = httpd_resp_send_chunk(req, "\r\n--frame\r\n", 11);
         if (res == ESP_OK) {
             size_t hlen = snprintf(partBuf, sizeof(partBuf),
                 "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n",
@@ -581,13 +593,13 @@ bool initCamera() {
     config.pin_sccb_scl = SIOC_GPIO_NUM;
     config.pin_pwdn     = PWDN_GPIO_NUM;
     config.pin_reset    = RESET_GPIO_NUM;
-    config.xclk_freq_hz = 16500000;          // 16.5 MHz — stabil, anti FB-OVF
-    config.frame_size   = FRAMESIZE_VGA;      // 640x480 — optimal untuk face recognition
+    config.xclk_freq_hz = 20000000;          // 20 MHz standar official CameraWebServer
+    config.frame_size   = FRAMESIZE_UXGA;    // Init besar dulu, lalu diturunkan ke VGA
     config.pixel_format = PIXFORMAT_JPEG;
-    config.grab_mode    = CAMERA_GRAB_LATEST;
+    config.grab_mode    = CAMERA_GRAB_WHEN_EMPTY;
     config.fb_location  = CAMERA_FB_IN_PSRAM;
     config.jpeg_quality = 12;
-    config.fb_count     = 2;
+    config.fb_count     = 1;
 
     if (psramFound()) {
         config.jpeg_quality = 10;
@@ -595,8 +607,6 @@ bool initCamera() {
         config.grab_mode    = CAMERA_GRAB_LATEST;
     } else {
         config.frame_size   = FRAMESIZE_SVGA;
-        config.fb_count     = 1;
-        config.grab_mode    = CAMERA_GRAB_WHEN_EMPTY;
         config.fb_location  = CAMERA_FB_IN_DRAM;
     }
 
@@ -622,10 +632,6 @@ bool connectWiFi() {
     WiFi.persistent(false);
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true);
-
-    // Drain frame kamera agar DMA FIFO bersih sebelum WiFi
-    camera_fb_t* fb = esp_camera_fb_get();
-    if (fb) esp_camera_fb_return(fb);
 
     for (int w = 0; w < wifiCount; w++) {
         lcdTampil("Cari WiFi...", wifiList[w].ssid);
@@ -662,6 +668,87 @@ bool connectWiFi() {
     setLedMerah(true);
     lcdWifiGagal();
     return false;
+}
+
+// =====================================================================
+//  HELPER: Ambil nilai string dari JSON sederhana
+// =====================================================================
+String extractJsonString(const String& json, const char* key) {
+    String pattern = String("\"") + key + "\":\"";
+    int idx = json.indexOf(pattern);
+    if (idx < 0) return "";
+    int start = idx + pattern.length();
+    int end = json.indexOf("\"", start);
+    if (end < 0) return "";
+    return json.substring(start, end);
+}
+
+// =====================================================================
+//  CLOUD SYNC TASK (Upload Railway + Poll Feedback Buzzer/LED)
+// =====================================================================
+void cloudSyncLoop(void* param) {
+    WiFiClientSecure secureClient;
+    secureClient.setInsecure();
+
+    HTTPClient https;
+    unsigned long lastFeedbackPoll = 0;
+    unsigned long lastLog = 0;
+    int okCount = 0;
+    int failCount = 0;
+
+    while (true) {
+        if (WiFi.status() == WL_CONNECTED) {
+            // 1. Upload frame kamera ke Railway
+            camera_fb_t* fb = esp_camera_fb_get();
+            if (fb) {
+                if (https.begin(secureClient, railwayUploadUrl)) {
+                    https.addHeader("Content-Type", "image/jpeg");
+                    https.setTimeout(3500);
+                    int code = https.POST(fb->buf, fb->len);
+                    if (code == 200) okCount++;
+                    else failCount++;
+                    https.end();
+                } else {
+                    failCount++;
+                }
+                esp_camera_fb_return(fb);
+            }
+
+            // 2. Cek perintah Buzzer/LED/LCD dari website (fitfacely.com)
+            if (millis() - lastFeedbackPoll >= feedbackPollMs) {
+                lastFeedbackPoll = millis();
+                if (https.begin(secureClient, feedbackUrl)) {
+                    https.setTimeout(3000);
+                    int code = https.GET();
+                    if (code == 200) {
+                        String body = https.getString();
+                        String id     = extractJsonString(body, "id");
+                        String status = extractJsonString(body, "status");
+                        String name   = extractJsonString(body, "name");
+
+                        if (id.length() > 0 && id != lastFeedbackId) {
+                            lastFeedbackId = id;
+                            if (status == "berhasil") {
+                                onAbsenBerhasil(name.c_str());
+                            } else if (status == "gagal") {
+                                onAbsenGagal();
+                            }
+                        }
+                    }
+                    https.end();
+                }
+            }
+
+            if (millis() - lastLog >= 10000) {
+                lastLog = millis();
+                Serial.printf("[Cloud] 10s: %d OK, %d Gagal | Heap: %u\n",
+                              okCount, failCount, ESP.getFreeHeap());
+                okCount = 0;
+                failCount = 0;
+            }
+        }
+        vTaskDelay(uploadIntervalMs / portTICK_PERIOD_MS);
+    }
 }
 
 // =====================================================================
@@ -710,23 +797,32 @@ void setup() {
         MDNS.begin("bisagym-kiosk");
         startWebServer();
 
+        // Jalankan task upload Railway + poll feedback di Core 1
+        xTaskCreatePinnedToCore(
+            cloudSyncLoop,
+            "cloudSync",
+            8192,
+            NULL,
+            1,
+            &cloudTaskHandle,
+            1
+        );
+
         String ip = WiFi.localIP().toString();
-        lcdTampilIP(ip.c_str());
+        lcdTampilIP("Railway Aktif!");
 
         // Beep 1x pendek tanda kiosk siap
         bunyikanBuzzer(1);
 
         Serial.println("\n========================================================");
-        Serial.println("     BisaGym Smart Kiosk ONLINE! (Mode Wi-Fi Lokal)     ");
+        Serial.println("     BisaGym Smart Kiosk ONLINE! (Mode Railway Cloud)   ");
         Serial.println("========================================================");
         Serial.printf("  Wi-Fi     : %s\n", wifiSSID.c_str());
-        Serial.printf("  IP Kiosk  : %s\n", ip.c_str());
-        Serial.printf("  Dashboard : http://%s/\n", ip.c_str());
-        Serial.printf("  Stream    : http://%s:81/stream\n", ip.c_str());
-        Serial.printf("  Capture   : http://%s/capture\n", ip.c_str());
-        Serial.printf("  Status    : http://%s/status\n", ip.c_str());
+        Serial.printf("  IP Lokal  : %s\n", ip.c_str());
+        Serial.printf("  Railway   : https://esp32cam-production-704ea82e.up.railway.app\n");
+        Serial.printf("  Feedback  : %s\n", feedbackUrl);
         Serial.println("========================================================");
-        Serial.println("Masukkan IP di atas ke halaman Absensi BisaGym.");
+        Serial.println("Masukkan URL Railway di atas ke halaman Absensi fitfacely.com.");
         Serial.println("========================================================\n");
     } else {
         Serial.printf("[ERROR] WiFi: %s | Kamera: %s\n",

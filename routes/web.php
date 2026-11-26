@@ -15,6 +15,9 @@ Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'ind
 Route::get('/pendaftaran', [\App\Http\Controllers\PublicRegistrationController::class, 'index'])->name('public.registration.index');
 Route::post('/pendaftaran', [\App\Http\Controllers\PublicRegistrationController::class, 'store'])->name('public.registration.store');
 
+// Endpoint publik untuk ESP32-CAM Kiosk mengambil feedback absensi terbaru (Buzzer, LED, LCD)
+Route::get('/api/kiosk-feedback', [\App\Http\Controllers\AttendanceController::class, 'kioskFeedback'])->name('api.kiosk-feedback');
+
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -44,6 +47,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/attendance/test-esp32', [\App\Http\Controllers\AttendanceController::class, 'testEsp32'])->name('attendance.test-esp32');
     Route::get('/attendance/esp32-frame', [\App\Http\Controllers\AttendanceController::class, 'esp32Frame'])->name('attendance.esp32-frame');
     Route::get('/attendance/esp32-stream', [\App\Http\Controllers\AttendanceController::class, 'esp32Stream'])->name('attendance.esp32-stream');
+    Route::post('/attendance/kiosk-feedback', [\App\Http\Controllers\AttendanceController::class, 'storeKioskFeedback'])->name('attendance.kiosk-feedback.store');
 
     Route::get('/face-enrollment', [\App\Http\Controllers\FaceEnrollmentController::class, 'index'])->name('face-enrollment.index');
     Route::post('/face-enrollment/{member}/start', [\App\Http\Controllers\FaceEnrollmentController::class, 'start'])->name('face-enrollment.start');

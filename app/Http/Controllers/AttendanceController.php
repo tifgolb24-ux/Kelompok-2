@@ -11,9 +11,11 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use App\Traits\HandlesEsp32Cam;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 class AttendanceController extends Controller
 {
@@ -437,5 +439,35 @@ class AttendanceController extends Controller
             'Access-Control-Allow-Origin' => '*',
             'X-Accel-Buffering' => 'no',
         ]);
+    }
+
+    public function storeKioskFeedback(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'status' => 'required|in:berhasil,gagal',
+            'name' => 'nullable|string|max:64',
+        ]);
+
+        $payload = [
+            'id' => (string) Str::uuid(),
+            'status' => $validated['status'],
+            'name' => $validated['name'] ?? '',
+            'ts' => now()->timestamp,
+        ];
+
+        Cache::put('bisagym_kiosk_feedback', $payload, now()->addSeconds(15));
+
+        return response()->json(['ok' => true, 'feedback' => $payload]);
+    }
+
+    public function kioskFeedback(): JsonResponse
+    {
+        $payload = Cache::get('bisagym_kiosk_feedback', [
+            'id' => '',
+            'status' => 'idle',
+            'name' => '',
+        ]);
+
+        return response()->json($payload);
     }
 }

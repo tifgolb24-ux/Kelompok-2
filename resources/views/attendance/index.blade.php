@@ -1019,8 +1019,23 @@
 
                     await this.sendBuzzerCommand(data.code === 'IDENTITY_NOT_FOUND' ? 'UNKNOWN' : 'OFF');
 
-                    // Kirim sinyal feedback ke ESP32 Kiosk (LED, Buzzer, LCD) lewat Wi-Fi lokal
-                    if (this.esp32Ip && this.esp32Ip.trim()) {
+                    // Kirim sinyal feedback ke ESP32 Kiosk (LED, Buzzer, LCD)
+                    if (this.esp32IsCloud) {
+                        // Mode Railway Cloud: simpan di server Laravel agar di-poll oleh ESP32
+                        fetch('{{ route("attendance.kiosk-feedback.store") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                status: data.decision === 'ALLOW' ? 'berhasil' : 'gagal',
+                                name: data.member?.name || ''
+                            })
+                        }).catch(() => {});
+                    } else if (this.esp32Ip && this.esp32Ip.trim()) {
+                        // Mode Lokal Wi-Fi: tembak langsung ke IP ESP32
                         const isSuccess = data.decision === 'ALLOW';
                         const statusParam = isSuccess ? 'berhasil' : 'gagal';
                         const memberName = data.member?.name || '';
