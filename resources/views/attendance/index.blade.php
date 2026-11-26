@@ -1019,7 +1019,7 @@
 
                     await this.sendBuzzerCommand(data.code === 'IDENTITY_NOT_FOUND' ? 'UNKNOWN' : 'OFF');
 
-                    // Kirim sinyal feedback ke ESP32 (LED 1/LED 2, Buzzer 1x/3x, & Layar LCD)
+                    // Kirim sinyal feedback ke ESP32 Kiosk (LED, Buzzer, LCD) lewat Wi-Fi lokal
                     if (this.esp32Ip && this.esp32Ip.trim()) {
                         const isSuccess = data.decision === 'ALLOW';
                         const statusParam = isSuccess ? 'berhasil' : 'gagal';

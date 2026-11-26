@@ -23,7 +23,6 @@
 #include <HTTPClient.h>
 #include <ESPmDNS.h>
 #include "esp_http_server.h"
-#include <Wire.h>
 
 // ===========================
 // WiFi (Hotspot HP 2.4 GHz)
@@ -59,192 +58,8 @@ bool cloudUploadActive       = true;
 #define HREF_GPIO_NUM     23
 #define PCLK_GPIO_NUM     22
 
-// =====================================================================
-// Konfigurasi Pin Periferal Tambahan (BisaGym Smart Kiosk)
-// =====================================================================
-#define PIN_LED_1          14   // LED 1 (Hijau: Absen Dikenali)
-#define PIN_LED_2           2   // LED 2 (Merah: Absen Tidak Dikenali)
-#define PIN_BUZZER         12   // Buzzer (1x Berhasil, 3x Gagal) - Ganti pin jika dicolok ke pin lain
-#define PIN_SUHU           16   // Sensor Suhu (Data Pin 16)
-#define PIN_I2C_SCL        13   // I2C LCD SCL (Pin 13)
-#define PIN_I2C_SDA        15   // I2C LCD SDA (Pin 15)
-#define PIN_RELAY           4   // Relay Kipas Angin (Pin 4)
-
-// Ambang Batas Suhu Kipas Otomatis
-float SUHU_PANAS_THRESHOLD  = 32.0; // Jika suhu >= 32.0 C -> Kipas (Relay) ON
-float SUHU_NORMAL_THRESHOLD = 29.0; // Jika suhu <= 29.0 C -> Kipas (Relay) OFF (Histeresis)
-#define LCD_I2C_ADDR        0x27    // Alamat I2C LCD (umumnya 0x27 atau 0x3F)
-
-// Level Aktif (Ubah ke LOW jika modul relay/buzzer Anda tipe Active-LOW)
-#define RELAY_ACTIVE_LEVEL HIGH // HIGH = Relay Kipas Menyala
-#define LED_ACTIVE_LEVEL   HIGH // HIGH = LED Menyala
-#define BUZZER_ACTIVE_LEVEL HIGH // HIGH = Buzzer Berbunyi
-
-// Status Periferal
-bool relayState   = false; // Status Kipas (Relay Pin 4)
-bool led1State    = false; // LED 1 (Pin 14)
-bool led2State    = false; // LED 2 (Pin 2)
-float suhuSekarang = 28.5; // Nilai suhu terakhir
-
-// Timer feedback absen (matikan LED/kembali standby setelah 3.5 detik)
-unsigned long ledFeedbackTurnOffTime = 0;
-bool ledFeedbackActive = false;
-
-// ---------------------------------------------------------------------
-// LCD 16x2 I2C (SCL Pin 13, SDA Pin 15)
-// ---------------------------------------------------------------------
-#if __has_include(<LiquidCrystal_I2C.h>)
-#include <LiquidCrystal_I2C.h>
-LiquidCrystal_I2C lcd(LCD_I2C_ADDR, 16, 2);
-#define HAS_LCD_LIB 1
-#else
-#define HAS_LCD_LIB 0
-#endif
-
-void lcdInit() {
-    Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
-#if HAS_LCD_LIB
-    lcd.init();
-    lcd.backlight();
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("BisaGym Kiosk");
-    lcd.setCursor(0, 1);
-    lcd.print("Siap Absensi...");
-#else
-    Serial.println("[LCD] Tips: Pasang library 'LiquidCrystal I2C' via Arduino Library Manager.");
-#endif
-}
-
-void lcdTampilkan(const char *baris1, const char *baris2 = "") {
-    Serial.printf("[LCD] [%s] [%s]\n", baris1, baris2 ? baris2 : "");
-#if HAS_LCD_LIB
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print(baris1);
-    if (baris2 && strlen(baris2) > 0) {
-        lcd.setCursor(0, 1);
-        lcd.print(baris2);
-    }
-#endif
-}
-
-void lcdResetStandby() {
-#if HAS_LCD_LIB
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("BisaGym FaceScan");
-    lcd.setCursor(0, 1);
-    char buf[17];
-    snprintf(buf, sizeof(buf), "%.1fC | FAN:%s", suhuSekarang, relayState ? "ON " : "OFF");
-    lcd.print(buf);
-#endif
-}
-
-// ---------------------------------------------------------------------
-// Kontrol Periferal (Relay, LED, Buzzer)
-// ---------------------------------------------------------------------
-void setRelay(bool on) {
-    relayState = on;
-    digitalWrite(PIN_RELAY, on ? RELAY_ACTIVE_LEVEL : !RELAY_ACTIVE_LEVEL);
-    Serial.printf("[KIPAS] Relay Kipas: %s\n", on ? "AKTIF (MENYALA)" : "NONAKTIF (MATI)");
-}
-
-void setLed1(bool on) {
-    led1State = on;
-    digitalWrite(PIN_LED_1, on ? LED_ACTIVE_LEVEL : !LED_ACTIVE_LEVEL);
-}
-
-void setLed2(bool on) {
-    led2State = on;
-    digitalWrite(PIN_LED_2, on ? LED_ACTIVE_LEVEL : !LED_ACTIVE_LEVEL);
-}
-
-// Bunyikan buzzer secara non-blocking via FreeRTOS Task
-void bunyikanBuzzer(int kali) {
-    xTaskCreate(
-        [](void *param) {
-            int n = (int)param;
-            for (int i = 0; i < n; i++) {
-                digitalWrite(PIN_BUZZER, BUZZER_ACTIVE_LEVEL);
-                vTaskDelay(200 / portTICK_PERIOD_MS);
-                digitalWrite(PIN_BUZZER, !BUZZER_ACTIVE_LEVEL);
-                if (i < n - 1) {
-                    vTaskDelay(120 / portTICK_PERIOD_MS);
-                }
-            }
-            vTaskDelete(NULL);
-        },
-        "buzzerTask",
-        1536,
-        (void*)kali,
-        1,
-        NULL
-    );
-}
-
-// ---------------------------------------------------------------------
-// Event Absensi (Dikenali & Tidak Dikenali)
-// ---------------------------------------------------------------------
-void onAbsenBerhasil(const char *nama = "Member") {
-    setLed1(true);  // LED 1 (Hijau) Hidup
-    setLed2(false); // LED 2 Mati
-    bunyikanBuzzer(1); // Buzzer bunyi 1 KALI
-
-    char baris2[17];
-    snprintf(baris2, sizeof(baris2), "%-.16s", (nama && strlen(nama) > 0) ? nama : "Selamat Datang");
-    lcdTampilkan("Absen Berhasil!", baris2);
-
-    ledFeedbackTurnOffTime = millis() + 3500;
-    ledFeedbackActive = true;
-    Serial.printf("[ABSEN] DIKENALI: %s -> LED 1 ON & Buzzer 1x\n", nama);
-}
-
-void onAbsenGagal() {
-    setLed1(false); // LED 1 Mati
-    setLed2(true);  // LED 2 (Merah) Hidup
-    bunyikanBuzzer(3); // Buzzer bunyi 3 KALI
-
-    lcdTampilkan("Akses Ditolak!", "Wajah Tdk Kenal");
-
-    ledFeedbackTurnOffTime = millis() + 3500;
-    ledFeedbackActive = true;
-    Serial.println("[ABSEN] TIDAK DIKENALI -> LED 2 ON & Buzzer 3x");
-}
-
-// ---------------------------------------------------------------------
-// Baca Sensor Suhu & Kontrol Kipas Otomatis
-// ---------------------------------------------------------------------
-float bacaSuhu() {
-    int val = digitalRead(PIN_SUHU);
-    // Sensor suhu digital (KY-028 / comparator): HIGH saat panas
-    if (val == HIGH) {
-        suhuSekarang = 34.0;
-    } else {
-        if (suhuSekarang > 30.0) suhuSekarang = 28.0;
-    }
-    return suhuSekarang;
-}
-
-void cekSuhuDanKipas() {
-    static unsigned long lastCheck = 0;
-    if (millis() - lastCheck < 2500) return;
-    lastCheck = millis();
-
-    float temp = bacaSuhu();
-
-    // Suhu terdeteksi panas -> Relay hidupkan kipas
-    // Suhu kembali normal -> Matikan kipas
-    if (temp >= SUHU_PANAS_THRESHOLD && !relayState) {
-        setRelay(true);
-        Serial.printf("[KIPAS] Suhu PANAS (%.1f C >= %.1f C) -> Kipas ON!\n", temp, SUHU_PANAS_THRESHOLD);
-        if (!ledFeedbackActive) lcdResetStandby();
-    } else if (temp <= SUHU_NORMAL_THRESHOLD && relayState) {
-        setRelay(false);
-        Serial.printf("[KIPAS] Suhu NORMAL (%.1f C <= %.1f C) -> Kipas OFF\n", temp, SUHU_NORMAL_THRESHOLD);
-        if (!ledFeedbackActive) lcdResetStandby();
-    }
-}
+// LED Flash (GPIO 4 untuk AI-Thinker)
+#define LED_GPIO_NUM       4
 
 httpd_handle_t httpServer   = NULL;  // port 80
 httpd_handle_t streamServer = NULL;  // port 81
@@ -255,13 +70,9 @@ httpd_handle_t streamServer = NULL;  // port 81
 static esp_err_t index_handler(httpd_req_t *req) {
     const char *html =
         "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'>"
-        "<title>BisaGym ESP32-CAM Smart Kiosk</title>"
-        "<style>body{text-align:center;font-family:sans-serif;background:#111;color:#eee;padding:10px}"
-        "button{padding:8px 14px;margin:4px;border:none;border-radius:6px;cursor:pointer;font-weight:bold}"
-        ".btn-green{background:#10b981;color:#fff}.btn-blue{background:#3b82f6;color:#fff}"
-        ".btn-red{background:#ef4444;color:#fff}.btn-dark{background:#374151;color:#eee}</style></head>"
-        "<body>"
-        "<h2>BisaGym ESP32-CAM Smart Kiosk</h2>"
+        "<title>BisaGym ESP32-CAM</title></head>"
+        "<body style='text-align:center;font-family:sans-serif;background:#111;color:#eee'>"
+        "<h2>BisaGym ESP32-CAM</h2>"
         "<img id='cam' style='max-width:100%;border-radius:8px'>"
         "<p>Resolusi: "
         "<select onchange='setRes(this.value)'>"
@@ -269,22 +80,8 @@ static esp_err_t index_handler(httpd_req_t *req) {
         "<option value='8' selected>VGA 640x480</option>"
         "<option value='9'>SVGA 800x600</option>"
         "</select></p>"
-        "<hr style='border:1px solid #333;margin:15px 0'>"
-        "<h3>Simulasi Absensi (Feedback Hardware)</h3>"
-        "<p>"
-        "<button class='btn-green' onclick=\"fetch('/absen?status=berhasil&name=Member%20Demo')\">Simulasi Absen Dikenali (LED 1 ON + Beep 1x)</button>"
-        "<button class='btn-red' onclick=\"fetch('/absen?status=gagal')\">Simulasi Absen Ditolak (LED 2 ON + Beep 3x)</button>"
-        "</p>"
-        "<h3>Kontrol Suhu & Kipas (Relay Pin 4)</h3>"
-        "<p>"
-        "<button class='btn-blue' onclick=\"fetch('/relay?state=1')\">Kipas ON</button>"
-        "<button class='btn-dark' onclick=\"fetch('/relay?state=0')\">Kipas OFF</button>"
-        "<button class='btn-dark' onclick=\"fetch('/suhu?val=35').then(()=>alert('Simulasi Suhu Panas 35C (Kipas akan ON)'))\">Simulasi Panas (35&deg;C)</button>"
-        "<button class='btn-dark' onclick=\"fetch('/suhu?val=27').then(()=>alert('Simulasi Suhu Normal 27C (Kipas akan OFF)'))\">Simulasi Normal (27&deg;C)</button>"
-        "</p>"
-        "<p><a style='color:#6cf' href='/capture' target='_blank'>Ambil Foto</a> | "
-        "<a style='color:#6cf' href='/status' target='_blank'>Status JSON</a> | "
-        "<a style='color:#a3e635' href='/suhu' target='_blank'>Data Suhu & Kipas</a></p>"
+        "<p><a style='color:#6cf' href='/capture' target='_blank'>Ambil foto</a> | "
+        "<a style='color:#6cf' href='/status' target='_blank'>Status</a></p>"
         "<script>"
         "var base='http://'+location.hostname+':81/stream';"
         "function startStream(){document.getElementById('cam').src=base+'?t='+Date.now();}"
@@ -356,120 +153,20 @@ static esp_err_t status_handler(httpd_req_t *req) {
     size_t frameBytes = frameOk ? testFb->len : 0;
     if (testFb) esp_camera_fb_return(testFb);
 
-    char json[384];
+    char json[256];
     snprintf(json, sizeof(json),
              "{\"status\":\"ready\",\"ip\":\"%s\","
              "\"psram\":%s,\"frame_ok\":%s,\"frame_bytes\":%u,"
-             "\"free_heap\":%u,"
-             "\"relay_kipas\":%s,\"led1\":%s,\"led2\":%s,\"suhu\":%.1f,\"suhu_pin\":%d,"
-             "\"threshold_panas\":%.1f,\"threshold_normal\":%.1f,"
-             "\"stream_url\":\"http://%s:81/stream\","
+             "\"free_heap\":%u,\"stream_url\":\"http://%s:81/stream\","
              "\"capture_url\":\"http://%s/capture\"}",
              WiFi.localIP().toString().c_str(),
              psramFound() ? "true" : "false",
              frameOk ? "true" : "false",
              (unsigned int)frameBytes,
              ESP.getFreeHeap(),
-             relayState ? "true" : "false",
-             led1State ? "true" : "false",
-             led2State ? "true" : "false",
-             suhuSekarang,
-             PIN_SUHU,
-             SUHU_PANAS_THRESHOLD,
-             SUHU_NORMAL_THRESHOLD,
              WiFi.localIP().toString().c_str(),
              WiFi.localIP().toString().c_str());
     return httpd_resp_send(req, json, strlen(json));
-}
-
-// ---------------------------
-// Handler Notifikasi Absensi: /absen?status=berhasil|gagal|1|0&name=Nama
-// ---------------------------
-static esp_err_t absen_handler(httpd_req_t *req) {
-    char query[128], statusVal[16], nameVal[32];
-    nameVal[0] = '\0';
-
-    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
-        httpd_query_key_value(query, "name", nameVal, sizeof(nameVal));
-
-        if (httpd_query_key_value(query, "status", statusVal, sizeof(statusVal)) == ESP_OK) {
-            if (strcmp(statusVal, "berhasil") == 0 || strcmp(statusVal, "1") == 0 ||
-                strcmp(statusVal, "allow") == 0 || strcmp(statusVal, "ALLOW") == 0) {
-                onAbsenBerhasil(nameVal[0] ? nameVal : "Member");
-            } else {
-                onAbsenGagal();
-            }
-        }
-    }
-
-    char resp[160];
-    snprintf(resp, sizeof(resp),
-             "{\"status\":\"ok\",\"led1\":%s,\"led2\":%s,\"relay_kipas\":%s}",
-             led1State ? "true" : "false", led2State ? "true" : "false", relayState ? "true" : "false");
-    httpd_resp_set_type(req, "application/json");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    return httpd_resp_send(req, resp, strlen(resp));
-}
-
-// ---------------------------
-// Handler Relay (Kipas): /relay?state=1 | /relay?state=0
-// ---------------------------
-static esp_err_t relay_handler(httpd_req_t *req) {
-    char query[64], val[16];
-    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
-        if (httpd_query_key_value(query, "state", val, sizeof(val)) == ESP_OK) {
-            int st = atoi(val);
-            setRelay(st == 1);
-        }
-    }
-    char resp[128];
-    snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"relay_kipas\":%s}", relayState ? "true" : "false");
-    httpd_resp_set_type(req, "application/json");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    return httpd_resp_send(req, resp, strlen(resp));
-}
-
-// ---------------------------
-// Handler LED: /led?id=1|2&state=1|0
-// ---------------------------
-static esp_err_t led_handler(httpd_req_t *req) {
-    char query[64], idVal[8], stateVal[8];
-    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
-        if (httpd_query_key_value(query, "id", idVal, sizeof(idVal)) == ESP_OK &&
-            httpd_query_key_value(query, "state", stateVal, sizeof(stateVal)) == ESP_OK) {
-            int id = atoi(idVal);
-            int st = atoi(stateVal);
-            if (id == 1) setLed1(st == 1);
-            else if (id == 2) setLed2(st == 1);
-        }
-    }
-    char resp[128];
-    snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"led1\":%s,\"led2\":%s}",
-             led1State ? "true" : "false", led2State ? "true" : "false");
-    httpd_resp_set_type(req, "application/json");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    return httpd_resp_send(req, resp, strlen(resp));
-}
-
-// ---------------------------
-// Handler Baca / Set Suhu: /suhu (atau /suhu?val=34)
-// ---------------------------
-static esp_err_t suhu_handler(httpd_req_t *req) {
-    char query[64], val[16];
-    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
-        if (httpd_query_key_value(query, "val", val, sizeof(val)) == ESP_OK) {
-            suhuSekarang = atof(val);
-            cekSuhuDanKipas();
-        }
-    }
-
-    char resp[192];
-    snprintf(resp, sizeof(resp),
-             "{\"status\":\"ok\",\"suhu\":%.1f,\"kipas\":%s,\"threshold_panas\":%.1f,\"threshold_normal\":%.1f,\"pin\":%d}",
-             suhuSekarang, relayState ? "true" : "false", SUHU_PANAS_THRESHOLD, SUHU_NORMAL_THRESHOLD, PIN_SUHU);
-    httpd_resp_set_type(req, "application/json");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    return httpd_resp_send(req, resp, strlen(resp));
 }
 
 // ---------------------------
@@ -522,32 +219,23 @@ static esp_err_t stream_handler(httpd_req_t *req) {
 // ---------------------------
 void startWebServer() {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 16;
+    config.max_uri_handlers = 8;
     config.stack_size = 8192;
 
-    // Port 80: halaman utama, capture, size, status, stream, dan hardware kontrol
+    // Port 80: halaman utama, capture, size, status, dan stream
     config.server_port = 80;
     if (httpd_start(&httpServer, &config) == ESP_OK) {
-        httpd_uri_t indexUri    = { "/",        HTTP_GET, index_handler,   NULL };
-        httpd_uri_t captureUri  = { "/capture", HTTP_GET, capture_handler, NULL };
-        httpd_uri_t sizeUri     = { "/size",    HTTP_GET, size_handler,    NULL };
-        httpd_uri_t statusUri   = { "/status",  HTTP_GET, status_handler,  NULL };
-        httpd_uri_t streamUri80 = { "/stream",  HTTP_GET, stream_handler,  NULL };
-        httpd_uri_t relayUri    = { "/relay",   HTTP_GET, relay_handler,   NULL };
-        httpd_uri_t ledUri      = { "/led",     HTTP_GET, led_handler,     NULL };
-        httpd_uri_t suhuUri     = { "/suhu",    HTTP_GET, suhu_handler,    NULL };
-        httpd_uri_t absenUri    = { "/absen",   HTTP_GET, absen_handler,   NULL };
-
+        httpd_uri_t indexUri   = { "/",        HTTP_GET, index_handler,   NULL };
+        httpd_uri_t captureUri = { "/capture", HTTP_GET, capture_handler, NULL };
+        httpd_uri_t sizeUri    = { "/size",    HTTP_GET, size_handler,    NULL };
+        httpd_uri_t statusUri  = { "/status",  HTTP_GET, status_handler,  NULL };
+        httpd_uri_t streamUri80 = { "/stream", HTTP_GET, stream_handler,  NULL };
         httpd_register_uri_handler(httpServer, &indexUri);
         httpd_register_uri_handler(httpServer, &captureUri);
         httpd_register_uri_handler(httpServer, &sizeUri);
         httpd_register_uri_handler(httpServer, &statusUri);
         httpd_register_uri_handler(httpServer, &streamUri80);
-        httpd_register_uri_handler(httpServer, &relayUri);
-        httpd_register_uri_handler(httpServer, &ledUri);
-        httpd_register_uri_handler(httpServer, &suhuUri);
-        httpd_register_uri_handler(httpServer, &absenUri);
-        Serial.println("[HTTP] Web server (port 80) aktif (Kamera & Kontrol Hardware)");
+        Serial.println("[HTTP] Web server (port 80) aktif (lengkap dengan /stream & /capture)");
     }
 
     // Port 81: MJPEG stream
@@ -717,23 +405,9 @@ void setup() {
     delay(1000);
     Serial.println("\n[BisaGym] ESP32-CAM CameraWebServer");
 
-    // Inisialisasi Pin Periferal Tambahan
-    pinMode(PIN_RELAY, OUTPUT);
-    digitalWrite(PIN_RELAY, !RELAY_ACTIVE_LEVEL); // Matikan relay kipas saat startup
-
-    pinMode(PIN_LED_1, OUTPUT);
-    digitalWrite(PIN_LED_1, !LED_ACTIVE_LEVEL);   // Matikan LED 1 (Hijau)
-
-    pinMode(PIN_LED_2, OUTPUT);
-    digitalWrite(PIN_LED_2, !LED_ACTIVE_LEVEL);   // Matikan LED 2 (Merah)
-
-    pinMode(PIN_BUZZER, OUTPUT);
-    digitalWrite(PIN_BUZZER, !BUZZER_ACTIVE_LEVEL); // Matikan Buzzer
-
-    pinMode(PIN_SUHU, INPUT);                     // Inisialisasi Pin Suhu
-
-    // Inisialisasi Bus I2C & Layar LCD 16x2
-    lcdInit();
+    // LED flash off
+    pinMode(LED_GPIO_NUM, OUTPUT);
+    digitalWrite(LED_GPIO_NUM, LOW);
 
     bool camOk  = initCamera();
     bool wifiOk = connectWiFi();
@@ -774,51 +448,20 @@ void setup() {
 }
 
 // ── Loop ─────────────────────────────────────────────────────────────
-unsigned long lastWifiCheck = 0;
-unsigned long lastLcdUpdate = 0;
-
 void loop() {
-    // 1. Cek timer feedback LED & LCD (reset ke standby setelah 3.5 detik)
-    if (ledFeedbackActive && millis() >= ledFeedbackTurnOffTime) {
-        setLed1(false);
-        setLed2(false);
-        ledFeedbackActive = false;
-        lcdResetStandby();
-    }
-
-    // 2. Cek sensor suhu dan kontrol otomatis Kipas (Relay Pin 4)
-    cekSuhuDanKipas();
-
-    // 3. Update status LCD standby secara berkala (setiap 4 detik saat standby)
-    if (!ledFeedbackActive && millis() - lastLcdUpdate >= 4000) {
-        lastLcdUpdate = millis();
-        lcdResetStandby();
-    }
-
-    // 4. Baca perintah dari Serial USB (misal dari browser via Web Serial)
-    if (Serial.available()) {
-        String cmd = Serial.readStringUntil('\n');
-        cmd.trim();
-        if (cmd == "OK" || cmd == "ALLOW" || cmd == "BERHASIL") {
-            onAbsenBerhasil("Member");
-        } else if (cmd == "UNKNOWN" || cmd == "DENY" || cmd == "GAGAL") {
-            onAbsenGagal();
-        } else if (cmd == "FAN_ON") {
-            setRelay(true);
-        } else if (cmd == "FAN_OFF") {
-            setRelay(false);
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("[WiFi] Terputus, reconnect...");
+        WiFi.disconnect();
+        WiFi.begin(ssid, password);
+        int t = 0;
+        while (WiFi.status() != WL_CONNECTED && t < 20) {
+            delay(500);
+            Serial.print(".");
+            t++;
+        }
+        if (WiFi.status() == WL_CONNECTED) {
+            Serial.printf("\n[WiFi] Tersambung kembali: %s\n", WiFi.localIP().toString().c_str());
         }
     }
-
-    // 5. Cek koneksi WiFi setiap 10 detik secara non-blocking
-    if (millis() - lastWifiCheck >= 10000) {
-        lastWifiCheck = millis();
-        if (WiFi.status() != WL_CONNECTED) {
-            Serial.println("[WiFi] Terputus, mencoba reconnect...");
-            WiFi.disconnect();
-            WiFi.begin(ssid, password);
-        }
-    }
-
-    delay(20); // Delay kecil agar CPU stabil dan tidak memicu watchdog
+    delay(10000);
 }
